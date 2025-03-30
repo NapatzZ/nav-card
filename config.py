@@ -150,3 +150,5 @@ class Config:
             'padding': 10,
             'line_height': 25
         }
+        
+        
