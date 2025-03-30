@@ -1,153 +1,152 @@
+"""
+Configuration module for card game.
+Contains all constants and settings for the game.
+"""
+import os
+import glob
+import pygame
+
 class Config:
+    """Class to store all configuration settings for the card game."""
+    
+    # Debug mode (0 = OFF, 1 = ON)
+    DEBUG_MODE = 0  # Set to 0 to disable debug information
+    
     # Screen and window settings
-    _SCREEN_WIDTH = 1600
-    _SCREEN_HEIGHT = 1200
-    _WINDOW_SCALE = 0.8  # 80% of screen size
+    SCREEN_SCALE = 0.8  # 80% of screen size
     
     # Colors
-    _BACKGROUND_COLOR = (53, 101, 77)  # Dark green for card table
-    _WHITE_COLOR = (255, 255, 255)
-    _BLACK_COLOR = (0, 0, 0)
-    _HIGHLIGHT_COLOR = (255, 255, 0, 180)  # Yellow for borders
-    _HOVER_COLOR = (192, 192, 192, 180)  # Light gray for hover effect
+    BACKGROUND_COLOR = (53, 101, 77)  # Dark green for card table
+    WHITE_COLOR = (255, 255, 255)
+    BLACK_COLOR = (0, 0, 0)
+    HIGHLIGHT_COLOR = (255, 255, 0, 180)  # Yellow for borders
+    EMPTY_AREA_COLOR = (70, 120, 90)  # Slightly lighter green for empty areas
     
     # Card dimensions
-    _CARD_WIDTH_RATIO = 0.25  # 25% of window width
-    _CARD_HEIGHT_RATIO = 1.5  # Height:width ratio of 1.5
-    _CARD_BORDER_RADIUS_RATIO = 0.1  # 10% of card width
+    CARD_WIDTH_RATIO = 0.25  # 25% of window width
+    CARD_HEIGHT_RATIO = 1.5  # Height:width ratio of 1.5
+    CARD_BORDER_RADIUS_RATIO = 0.1  # 10% of card width
     
-    # Card positions and area settings
-    _DECK_POSITION_RATIO = (0.25, 0.5)  # 25% from left, centered vertically
-    _COMMUNITY_POSITION_RATIO = (0.75, 0.5)  # 75% from left, centered vertically
-    _VALID_AREA_SCALE = 1.4  # 140% of card size
+    # Valid placement areas
+    VALID_AREA_SCALE = 1.4  # 140% of card size
     
     # Preview settings
-    _PREVIEW_RADIUS_RATIO = 0.3  # 30% of window width
-    _PREVIEW_CENTER_OFFSET = 100  # Offset from bottom
-    _PREVIEW_ANGLE = 60  # Angle in degrees
-    _PREVIEW_ANIMATION_SPEED = 0.1
-    _PREVIEW_HOVER_SCALE = 1.1  # 10% larger on hover
+    PREVIEW_RADIUS_RATIO = 0.3  # 30% of window width
+    PREVIEW_CENTER_OFFSET = 100  # Offset from bottom
+    PREVIEW_ANGLE = 60  # Angle in degrees
+    PREVIEW_ANIMATION_SPEED = 0.2
+    PREVIEW_HOVER_SCALE = 1.18  # Increased from 1.15 to 1.18
+    PREVIEW_HOVER_LIFT = 50    # Increased from 40 to 50
     
     # Shadow settings
-    _SHADOW_OFFSET = 5
-    _SHADOW_OPACITY = 64  # Alpha value for shadow
+    SHADOW_OFFSET = 5
+    SHADOW_OPACITY = 64  # Alpha value for shadow
     
-    # Card types
-    _VALID_CARD_TYPES = ["Navigation", "Collision_avoidance", "Recovery"]
-    _VALID_CARD_NAMES = ["A_Star", "Wall_Following", "RRT", "Greedy_Search", "Dijkstra", 
-                        "DWA", "Bug", "VFH", "Spin-in-Place", "Step-Back"]
+    # New constants for hover transition
+    HOVER_TRANSITION_SPEED = 0.3  # Speed of hover state change (0-1)
+    HOVER_TRANSITION_SPEED_OUT = 0.4  # Speed of hover state reduction (0-1)
     
-    @classmethod
-    def get_window_dimensions(cls, screen_info):
+    @staticmethod
+    def get_window_dimensions():
         """Calculate window dimensions based on actual screen size."""
-        actual_width = screen_info.current_w
-        actual_height = screen_info.current_h
-        
-        window_width = int(actual_width * cls._WINDOW_SCALE)
-        window_height = int(actual_height * cls._WINDOW_SCALE)
-        
+        screen_info = pygame.display.Info()
+        window_width = int(screen_info.current_w * Config.SCREEN_SCALE)
+        window_height = int(screen_info.current_h * Config.SCREEN_SCALE)
         return window_width, window_height
     
-    @classmethod
-    def get_card_dimensions(cls, window_width):
+    @staticmethod
+    def get_card_dimensions(window_width):
         """Calculate card dimensions based on window width."""
-        card_width = int(window_width * cls._CARD_WIDTH_RATIO)
-        card_height = int(card_width * cls._CARD_HEIGHT_RATIO)
-        
+        card_width = int(window_width * Config.CARD_WIDTH_RATIO)
+        card_height = int(card_width * Config.CARD_HEIGHT_RATIO)
         return card_width, card_height
     
-    @classmethod
-    def get_card_border_radius(cls, card_width):
+    @staticmethod
+    def get_card_border_radius(card_width):
         """Calculate card border radius based on card width."""
-        return int(card_width * cls._CARD_BORDER_RADIUS_RATIO)
+        return int(card_width * Config.CARD_BORDER_RADIUS_RATIO)
     
-    @classmethod
-    def get_positions(cls, window_width, window_height):
-        """Calculate positions for deck and community areas."""
-        deck_position = (int(window_width * cls._DECK_POSITION_RATIO[0]), 
-                         int(window_height * cls._DECK_POSITION_RATIO[1]))
-        
-        community_position = (int(window_width * cls._COMMUNITY_POSITION_RATIO[0]), 
-                             int(window_height * cls._COMMUNITY_POSITION_RATIO[1]))
-        
-        return deck_position, community_position
+    @staticmethod
+    def get_area_positions(window_width, window_height):
+        """Get positions for all card placement areas."""
+        # Divide the area into 3 symmetrical sections with equal spacing
+        # Use the ratio 1/6, 3/6, 5/6 of the screen width
+        return {
+            "Navigation": (int(window_width * (1/6)), window_height // 2),  # Left
+            "Collision_avoidance": (int(window_width * (3/6)), window_height // 2),  # Center
+            "Recovery": (int(window_width * (5/6)), window_height // 2),  # Right
+            "deck": (int(window_width * 0.5), int(window_height * 0.85))  # Bottom
+        }
     
-    @classmethod
-    def get_valid_area_dimensions(cls, card_width, card_height):
+    @staticmethod
+    def get_area_labels():
+        """Get labels for card placement areas."""
+        return {
+            "Navigation": "Navigation",
+            "Collision_avoidance": "Collision_avoidance",
+            "Recovery": "Recovery"
+        }
+    
+    @staticmethod
+    def get_valid_area_dimensions(card_width, card_height):
         """Calculate dimensions for valid placement areas."""
-        valid_width = int(card_width * cls._VALID_AREA_SCALE)
-        valid_height = int(card_height * cls._VALID_AREA_SCALE)
-        
+        valid_width = int(card_width * 1.2)
+        valid_height = int(card_height * 1.2)
         return valid_width, valid_height
     
-    @classmethod
-    def get_preview_settings(cls, window_width, window_height):
-        """Calculate preview mode settings."""
-        preview_radius = int(window_width * cls._PREVIEW_RADIUS_RATIO)
-        preview_center = (window_width // 2, 
-                          window_height - cls._PREVIEW_CENTER_OFFSET)
-        
+    @staticmethod
+    def get_preview_settings(window_width, window_height):
+        """Get settings for the preview mode."""
         return {
-            'radius': preview_radius,
-            'center': preview_center,
-            'angle': cls._PREVIEW_ANGLE,
-            'animation_speed': cls._PREVIEW_ANIMATION_SPEED,
-            'hover_scale': cls._PREVIEW_HOVER_SCALE
+            'radius': int(window_height * 0.4),  # 40% of screen height
+            'center': (window_width // 2, int(window_height * 0.6)),  # Center horizontally, 60% of height vertically
+            'hover_lift': 40,  # Amount to lift when hovering
+            'animation_speed': 0.2  # Animation speed (0-1)
         }
     
-    @classmethod
-    def get_shadow_settings(cls):
-        """Get shadow settings."""
+    @staticmethod
+    def get_shadow_settings():
+        """Get shadow settings for cards."""
         return {
-            'offset': cls._SHADOW_OFFSET,
-            'opacity': cls._SHADOW_OPACITY
+            'offset': Config.SHADOW_OFFSET,
+            'opacity': Config.SHADOW_OPACITY
         }
     
-    @classmethod
-    def load_image_of(cls, name):
+    @staticmethod
+    def get_card_types():
+        """Get valid card types."""
+        return ["Navigation", "Collision_avoidance", "Recovery"]
+    
+    @staticmethod
+    def get_card_names():
+        """Get valid card names for each type."""
+        return {
+            "Navigation": ["A_Star", "Wall_Following", "RRT", "Greedy_Search", "Dijkstra"],
+            "Collision_avoidance": ["DWA", "Bug", "VFH"],
+            "Recovery": ["Spin-in-Place", "Step-Back"]
+        }
+    
+    @staticmethod
+    def load_card_image(card_name):
         """Load card image from assets folder."""
-        import os
-        import glob
-        
-        print(f"\n****************Loading image for card: {name}****************")
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(current_dir, "assets", f"{name}.png")
-        print(f"Loading image from: {image_path}")
-        image_path = glob.glob(image_path)
-        print(f"Image path found: {image_path}")
+        image_path = os.path.join(current_dir, "assets", f"{card_name}.png")
+        image_files = glob.glob(image_path)
         
-        if not image_path:
-            error_message = f"Image {name}.png not found in assets directory."
-            error_line = f"**************** {error_message:^5} ****************"
-            raise FileNotFoundError(error_line)      
+        if not image_files:
+            # Create a placeholder if image is not found
+            return None
         
-        print("************************************************\n")
-        return image_path[0]
+        return image_files[0]
     
-    @classmethod
-    def background_color(cls):
-        return cls._BACKGROUND_COLOR
-    
-    @classmethod
-    def white_color(cls):
-        return cls._WHITE_COLOR
-    
-    @classmethod
-    def black_color(cls):
-        return cls._BLACK_COLOR
-    
-    @classmethod
-    def highlight_color(cls):
-        return cls._HIGHLIGHT_COLOR
-    
-    @classmethod
-    def hover_color(cls):
-        return cls._HOVER_COLOR
-    
-    @classmethod
-    def valid_card_types(cls):
-        return cls._VALID_CARD_TYPES
-    
-    @classmethod
-    def valid_card_names(cls):
-        return cls._VALID_CARD_NAMES
+    @staticmethod
+    def get_debug_settings():
+        """Get debug information display settings."""
+        return {
+            'enabled': Config.DEBUG_MODE == 1,
+            'font_size': 24,
+            'bg_color': (0, 0, 0, 150),  # Semi-transparent black
+            'text_color': (255, 255, 255),  # White text
+            'padding': 10,
+            'line_height': 25
+        }
