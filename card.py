@@ -667,10 +667,8 @@ class CardDeck:
         # For now, just add the two test cards as specified
         self.__cards.append(Card("Navigation", "A_Star"))
         self.__cards.append(Card("Navigation", "Wall_Following"))
-        self.__cards.append(Card("Navigation", "A_Star"))
-        self.__cards.append(Card("Navigation", "Wall_Following"))
-        self.__cards.append(Card("Navigation", "A_Star"))
-        self.__cards.append(Card("Navigation", "Wall_Following"))        
+        self.__cards.append(Card("Navigation", "RRT"))
+    
         # In the future, add all 10 cards here
     
     def handle_events(self, events):
