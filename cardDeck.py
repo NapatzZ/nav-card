@@ -39,6 +39,28 @@ class CardDeck:
         # Clear any cards in invalid states
         self.__clear_unused_cards()
     
+    def reset_cards(self):
+        """รีเซ็ตการ์ดทั้งหมดกลับสู่ deck"""
+        print("[CardDeck] Resetting all cards to deck")
+        
+        # รีเซ็ต placed_cards dictionary
+        for area in self.__placed_cards:
+            self.__placed_cards[area] = None
+        
+        # รีเซ็ตสถานะของทุกการ์ด
+        for card in self.__cards:
+            card.current_area = "deck"
+            card.position = card.original_position
+            card.rect.center = card.position
+            card.exit_preview_mode()
+            card.hovering_area = None
+            card.hovering_over_card = False
+        
+        # ปิดโหมด preview
+        self.__preview_mode = False
+        self.__deck_visible = False
+        self.__hovered_card_index = -1
+    
     def __add_starting_cards(self):
         """Add initial cards to the deck for testing."""
         # กำหนดการ์ดทั้งหมดที่นี่

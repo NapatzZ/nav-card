@@ -60,11 +60,17 @@ class GameManager:
             self.start_game()
     
     def reset_game(self):
-        """รีเซ็ตเกมกลับสู่สถานะเริ่มต้น"""
+        """รีเซ็ตเกมกลับสู่สถานะเริ่มต้น โดยย้ายการ์ดทั้งหมดจาก stage กลับไปที่ deck"""
         print("[GameManager] Resetting game...")
-        # สร้าง stage และ card_deck ใหม่
-        self.stage = Stage()
-        self.card_deck = CardDeck(self.stage)
+        
+        # ลบการ์ดจากทุกช่อง
+        for slot in self.stage.slots:
+            slot.card = None
+        
+        # เรียกใช้ reset_cards จาก card_deck
+        self.card_deck.reset_cards()
+        
+        # เปลี่ยนสถานะเกมเป็น PLAYING
         self.game_state.change_state("PLAYING")
     
     def start_game(self):
