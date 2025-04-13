@@ -3,6 +3,63 @@ from typing import List, Tuple, Optional
 from card import Card, CardType
 from config import Config
 
+class Button:
+    def __init__(self, position: Tuple[int, int], image_path: str, action_name: str):
+        """สร้างปุ่มด้วยรูปภาพ
+        
+        Args:
+            position (Tuple[int, int]): ตำแหน่งของปุ่ม
+            image_path (str): พาธของไฟล์รูปภาพ
+            action_name (str): ชื่อการกระทำเมื่อคลิกปุ่ม
+        """
+        self.position = position
+        self.action_name = action_name
+        
+        # โหลดรูปภาพ
+        try:
+            self.image = pygame.image.load(image_path)
+            # ปรับขนาดภาพถ้าต้องการ
+            self.image = pygame.transform.scale(self.image, (250, 150))
+        except pygame.error:
+            # สร้างพื้นผิวว่างถ้าโหลดรูปไม่สำเร็จ
+            self.image = pygame.Surface((100, 50))
+            self.image.fill((150, 150, 150))
+            font = pygame.font.Font(None, 24)
+            text = font.render(action_name, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(50, 25))
+            self.image.blit(text, text_rect)
+        
+        # สร้าง rect สำหรับตรวจสอบการคลิก
+        self.rect = self.image.get_rect(center=position)
+        
+        # สถานะของปุ่ม
+        self.is_hovered = False
+        
+    def draw(self, screen: pygame.Surface):
+        """วาดปุ่มลงบนหน้าจอ"""
+        # วาดเงาถ้าปุ่มถูก hover
+        if self.is_hovered:
+
+            
+            # วาดปุ่มขนาดใหญ่ขึ้นเล็กน้อย
+            scaled_image = pygame.transform.scale(self.image, 
+                                                 (int(self.rect.width * 1.25), 
+                                                  int(self.rect.height * 1.25)))
+            scaled_rect = scaled_image.get_rect(center=self.rect.center)
+            screen.blit(scaled_image, scaled_rect)
+        else:
+            # วาดปุ่มปกติ
+            screen.blit(self.image, self.rect)
+    
+    def check_hover(self, mouse_pos: Tuple[int, int]) -> bool:
+        """ตรวจสอบว่าเมาส์อยู่เหนือปุ่มหรือไม่"""
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        return self.is_hovered
+    
+    def is_clicked(self, mouse_pos: Tuple[int, int]) -> bool:
+        """ตรวจสอบว่าปุ่มถูกคลิกหรือไม่"""
+        return self.rect.collidepoint(mouse_pos)
+
 class CardSlot:
     def __init__(self, position: tuple[int, int], card_type: CardType):
         """Initialize a card slot.
@@ -168,6 +225,9 @@ class Stage:
         self.slots: List[CardSlot] = []
         self._initialize_slots()
         self.background = self._create_background()
+        
+        # เพิ่มปุ่ม Reset และ Start
+        self.buttons = self._initialize_buttons()
 
     def _create_background(self) -> pygame.Surface:
         """Create the game board background."""
@@ -180,6 +240,23 @@ class Stage:
                 pygame.draw.circle(surface, (0, 100, 0), (x, y), 2)
         
         return surface
+    
+    def _initialize_buttons(self) -> List[Button]:
+        """สร้างปุ่มต่างๆ สำหรับ Stage"""
+        buttons = []
+        
+        # คำนวณตำแหน่งปุ่ม
+        reset_pos = (Config.BOARD_WIDTH // 3, Config.BOARD_HEIGHT - 80)
+        start_pos = (Config.BOARD_WIDTH * 2 // 3, Config.BOARD_HEIGHT - 80)
+        
+        # สร้างปุ่ม
+        reset_button = Button(reset_pos, "assets/reset.png", "reset")
+        start_button = Button(start_pos, "assets/startButton.png", "start")
+        
+        buttons.append(reset_button)
+        buttons.append(start_button)
+        
+        return buttons
 
     def _initialize_slots(self):
         """Initialize card slots with their positions and types."""
@@ -200,6 +277,10 @@ class Stage:
         # วาดช่องวางการ์ดทั้งหมด
         for slot in self.slots:
             slot.draw(screen, dragging_card)
+            
+        # วาดปุ่มทั้งหมด
+        for button in self.buttons:
+            button.draw(screen)
 
     def handle_card_drag(self, card: Card, mouse_pos: tuple[int, int]):
         """จัดการการลากการ์ด"""
@@ -224,6 +305,25 @@ class Stage:
         
         # ถ้าไม่พบช่องที่เหมาะสม
         card.hovering_area = None
+        
+    def handle_mouse_motion(self, mouse_pos: Tuple[int, int]):
+        """จัดการการเคลื่อนไหวของเมาส์เพื่ออัปเดตสถานะของปุ่ม"""
+        for button in self.buttons:
+            button.check_hover(mouse_pos)
+
+    def handle_button_click(self, mouse_pos: Tuple[int, int]) -> Optional[str]:
+        """จัดการการคลิกปุ่ม
+        
+        Args:
+            mouse_pos: ตำแหน่งของเมาส์ที่คลิก
+            
+        Returns:
+            str หรือ None: ชื่อการกระทำของปุ่มที่ถูกคลิก หรือ None ถ้าไม่มีปุ่มใดถูกคลิก
+        """
+        for button in self.buttons:
+            if button.is_clicked(mouse_pos):
+                return button.action_name
+        return None
 
     def place_card(self, card: Card, position: tuple[int, int]) -> bool:
         """พยายามวางการ์ดในช่องที่เหมาะสม"""

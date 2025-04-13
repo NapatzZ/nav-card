@@ -34,9 +34,44 @@ class GameManager:
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
+            
+            # จัดการการเคลื่อนไหวของเมาส์สำหรับปุ่ม
+            elif event.type == pygame.MOUSEMOTION:
+                self.stage.handle_mouse_motion(event.pos)
+            
+            # จัดการการคลิกปุ่ม
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                button_action = self.stage.handle_button_click(event.pos)
+                if button_action:
+                    self.handle_button_action(button_action)
         
         # Handle card events
         self.card_deck.handle_events(events)
+    
+    def handle_button_action(self, action: str):
+        """จัดการกับการคลิกปุ่ม
+        
+        Args:
+            action (str): ชื่อของการกระทำจากปุ่มที่ถูกคลิก
+        """
+        if action == "reset":
+            self.reset_game()
+        elif action == "start":
+            self.start_game()
+    
+    def reset_game(self):
+        """รีเซ็ตเกมกลับสู่สถานะเริ่มต้น"""
+        print("[GameManager] Resetting game...")
+        # สร้าง stage และ card_deck ใหม่
+        self.stage = Stage()
+        self.card_deck = CardDeck(self.stage)
+        self.game_state.change_state("PLAYING")
+    
+    def start_game(self):
+        """เริ่มเกม"""
+        print("[GameManager] Starting game...")
+        # เปลี่ยนสถานะเกมเป็น PLAYING
+        self.game_state.change_state("PLAYING")
     
     def update(self):
         """Update game state."""
