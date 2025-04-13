@@ -15,6 +15,17 @@ class Config:
     # Screen and window settings
     SCREEN_SCALE = 0.8  # 80% of screen size
     
+    # Board dimensions
+    BOARD_WIDTH = 1200
+    BOARD_HEIGHT = 800
+    BOARD_COLOR = (53, 101, 77)  # Dark green for card table
+    
+    # Card slot dimensions
+    CARD_SLOT_WIDTH = 300
+    CARD_SLOT_HEIGHT = 500
+    CARD_SLOT_SPACING = 50
+    CARD_SLOT_COLOR = (70, 120, 90)  # Slightly lighter green for empty areas
+    
     # Colors
     BACKGROUND_COLOR = (53, 101, 77)  # Dark green for card table
     WHITE_COLOR = (255, 255, 255)
@@ -29,13 +40,15 @@ class Config:
     
     # Valid placement areas
     VALID_AREA_SCALE = 1.4  # 140% of card size
+    VALID_AREA_PADDING = 20  # เพิ่มระยะห่างจากขอบ
+    VALID_AREA_ALPHA = 200  # ความโปร่งใสของ valid area
     
     # Preview settings
     PREVIEW_RADIUS_RATIO = 0.3  # 30% of window width
     PREVIEW_CENTER_OFFSET = 100  # Offset from bottom
     PREVIEW_ANGLE = 60  # Angle in degrees
     PREVIEW_ANIMATION_SPEED = 0.2
-    PREVIEW_HOVER_SCALE = 1.18  # Increased from 1.15 to 1.18
+    PREVIEW_HOVER_SCALE = 1.2
     PREVIEW_HOVER_LIFT = 50    # Increased from 40 to 50
     
     # Shadow settings
@@ -45,6 +58,9 @@ class Config:
     # New constants for hover transition
     HOVER_TRANSITION_SPEED = 0.3  # Speed of hover state change (0-1)
     HOVER_TRANSITION_SPEED_OUT = 0.4  # Speed of hover state reduction (0-1)
+    
+    # Card hover settings
+    HOVER_SCALE = 1.1
     
     @staticmethod
     def get_window_dimensions():
@@ -90,8 +106,8 @@ class Config:
     @staticmethod
     def get_valid_area_dimensions(card_width, card_height):
         """Calculate dimensions for valid placement areas."""
-        valid_width = int(card_width * 1.2)
-        valid_height = int(card_height * 1.2)
+        valid_width = int(card_width * Config.VALID_AREA_SCALE)
+        valid_height = int(card_height * Config.VALID_AREA_SCALE)
         return valid_width, valid_height
     
     @staticmethod
