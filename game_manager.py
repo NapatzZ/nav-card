@@ -3,8 +3,10 @@ GameManager module for managing the main game loop and states.
 """
 import pygame
 from config import Config
-from card import CardDeck
+from cardDeck import CardDeck 
+from card import Card
 from state import GameState
+from stage import Stage
 
 class GameManager:
     """Class to manage the main game loop and states."""
@@ -19,7 +21,8 @@ class GameManager:
         pygame.display.set_caption("Card Game")
         
         # Initialize game components
-        self.card_deck = CardDeck()
+        self.stage = Stage()
+        self.card_deck = CardDeck(self.stage)
         self.game_state = GameState()
         self.clock = pygame.time.Clock()
         self.running = True
@@ -44,6 +47,16 @@ class GameManager:
         """Draw all game elements."""
         # Clear the screen
         self.screen.fill(Config.BACKGROUND_COLOR)
+        
+        # หาการ์ดที่กำลังลากอยู่
+        dragging_card = None
+        for card in self.card_deck.cards:
+            if card.dragging:
+                dragging_card = card
+                break
+        
+        # Draw stage first (background and slots)
+        self.stage.draw(self.screen, dragging_card)
         
         # Draw game elements
         self.card_deck.draw(self.screen)

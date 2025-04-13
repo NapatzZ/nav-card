@@ -4,7 +4,15 @@ Contains classes for managing cards and card deck.
 """
 import math
 import pygame
+from enum import Enum
 from config import Config
+from typing import Optional
+
+class CardType(Enum):
+    """Enum for card types."""
+    NAVIGATION = "Navigation"
+    COLLISION_AVOIDANCE = "Collision_avoidance"
+    RECOVERY_BEHAVIOR = "Recovery"
 
 class Card:
     """Class representing a card in the game."""
@@ -26,21 +34,16 @@ class Card:
         self.__width, self.__height = Config.get_card_dimensions(self.__window_width)
         self.__border_radius = Config.get_card_border_radius(self.__width)
         
-        # Set up positions and areas
-        self.__area_positions = Config.get_area_positions(self.__window_width, self.__window_height)
-        self.__position = self.__area_positions["deck"]  # Start in deck
+        # Set up positions
+        self.__position = (0, 0)  # Start at origin
         self.__original_position = self.__position
-        
-        # Set up valid area dimensions and rects
-        self.__valid_area_dimensions = Config.get_valid_area_dimensions(self.__width, self.__height)
-        self.__area_rects = self.__create_area_rects()
         
         # Load image and create shadow
         self.__load_image(card_name)
         self.__create_shadow()
         
         # Card states
-        self.__current_area = "deck"
+        self.__current_area = None
         self.__dragging = False
         self.__drag_offset = (0, 0)
         self.__hovering = False
@@ -51,7 +54,7 @@ class Card:
         # Preview mode
         self.__in_preview = False
         self.__preview_index = -1
-        self.__preview_total_cards = 0  # เพิ่มตัวแปรนี้เพื่อเก็บจำนวนการ์ดทั้งหมดในโหมด preview
+        self.__preview_total_cards = 0
         self.__preview_settings = Config.get_preview_settings(self.__window_width, self.__window_height)
         
         # Create rectangle for collision detection
@@ -105,21 +108,6 @@ class Card:
             border_radius=self.__border_radius
         )
     
-    def __create_area_rects(self):
-        """Create rectangles for all placement areas."""
-        area_rects = {}
-        valid_width, valid_height = self.__valid_area_dimensions
-        
-        for area_name, position in self.__area_positions.items():
-            area_rects[area_name] = pygame.Rect(
-            position[0] - valid_width//2,
-            position[1] - valid_height//2,
-            valid_width,
-            valid_height
-        )
-        
-        return area_rects
-    
     def __update_position(self):
         """Update the rectangle position to match the card position."""
         self.__rect.center = self.__position
@@ -139,79 +127,39 @@ class Card:
         self.__current_area = None
     
     def stop_dragging(self):
-        """Stop dragging the card and place it in the appropriate area."""
+        """Stop dragging the card."""
         self.__dragging = False
-        
-        # Check if the card is in a valid area
-        placed = False
-        
-        for area_name, area_rect in self.__area_rects.items():
-            if area_rect.collidepoint(self.__position):
-                # Check if this area is valid for this card type
-                if area_name == self.__card_type:  # Remove deck option
-                    self.__position = self.__area_positions[area_name]
-                    self.__current_area = area_name
-                    placed = True
-                    break
-        
-        if not placed:
-                    # Return to original position if not placed in a valid area
-            self.__position = self.__original_position
-            # Determine current area based on original position
-            for area_name, pos in self.__area_positions.items():
-                if pos == self.__original_position:
-                    self.__current_area = area_name
-                    break
-        
+        self.__position = self.__original_position
         self.__update_position()
     
-    def update_dragging(self, mouse_pos, placed_cards):
+    def update_dragging(self, mouse_pos):
         """Update card position while dragging.
         
         Args:
             mouse_pos (tuple): Current mouse position (x, y)
-            placed_cards (dict): Dictionary of cards placed in each area
         """
         if self.__dragging:
+            # อัพเดทตำแหน่งการ์ด
             self.__position = (
                 mouse_pos[0] + self.__drag_offset[0],
                 mouse_pos[1] + self.__drag_offset[1]
             )
             self.__update_position()
             
-            # Update hover state - store which area is being hovered
+            # รีเซ็ตสถานะ hovering
             self.__hovering = False
             self.__hovering_area = None
             self.__hovering_over_card = False
-            
-            # Check all areas and update hovering state appropriately
-            for area_name, area_rect in self.__area_rects.items():
-                # Skip deck area
-                if area_name == "deck":
-                    continue
-                
-                if area_rect.collidepoint(self.__position):
-                    # Only highlight when hovering over correct area type
-                    if area_name == self.__card_type:
-                        self.__hovering = True
-                        self.__hovering_area = area_name
-                        
-                        # Check if we're hovering over an existing card
-                        if placed_cards[area_name] is not None and placed_cards[area_name] != self:
-                            self.__hovering_over_card = True
-                        break  # Stop checking once found
     
     def set_hovering(self, is_hovering):
         """Set whether the card is being hovered over.
         
         Args:
-            is_hovering (bool): Whether the mouse is hovering over the card
+            is_hovering (bool): Whether the card is being hovered over
         """
         self.__hovering = is_hovering
-        
-        # Always set the hover scale directly without transition for clearer results
         if is_hovering:
-            self.__hover_scale = Config.PREVIEW_HOVER_SCALE
+            self.__hover_scale = Config.HOVER_SCALE
         else:
             self.__hover_scale = 1.0
     
@@ -224,7 +172,7 @@ class Card:
         """
         self.__in_preview = True
         self.__preview_index = index
-        self.__preview_total_cards = total_cards  # เก็บจำนวนการ์ดทั้งหมด
+        self.__preview_total_cards = total_cards
     
     def exit_preview_mode(self):
         """Exit preview mode for this card."""
@@ -232,14 +180,15 @@ class Card:
         self.__preview_index = -1
     
     def contains_point(self, point):
-        """Check if the given point is inside the card.
+        """Check if a point is within the card's area.
         
         Args:
             point (tuple): Point to check (x, y)
         
         Returns:
-            bool: True if the point is inside the card, False otherwise
+            bool: True if point is within the card's area
         """
+        # ตรวจสอบว่าจุดอยู่ในพื้นที่การ์ดหรือไม่
         return self.__rect.collidepoint(point)
     
     def is_in_preview_area(self, point, total_cards):
@@ -539,6 +488,11 @@ class Card:
         return self.__card_name
     
     @property
+    def original_position(self):
+        """Get the card's original position."""
+        return self.__original_position
+    
+    @property
     def position(self):
         """Get the card's current position."""
         return self.__position
@@ -558,13 +512,10 @@ class Card:
     def current_area(self, area):
         """Set the card's current area."""
         self.__current_area = area
-        if area is not None and area in self.__area_positions:
-            self.__position = self.__area_positions[area]
-            self.__update_position()
     
     @property
     def dragging(self):
-        """Check if the card is being dragged."""
+        """Get whether the card is being dragged."""
         return self.__dragging
     
     @property
@@ -618,7 +569,7 @@ class Card:
         self.__drag_offset = (0, 0)
         
         self.__dragging = True
-        self.__original_position = self.__area_positions["deck"]
+        self.__original_position = self.__position
         self.__current_area = None
     
     @property
@@ -626,405 +577,55 @@ class Card:
         """Get the area the card is currently hovering over."""
         return self.__hovering_area
     
+    @hovering_area.setter
+    def hovering_area(self, value):
+        """Set the area the card is currently hovering over."""
+        self.__hovering_area = value
+
     @property
     def hovering_over_card(self):
         """Check if card is hovering over another card."""
         return self.__hovering_over_card
 
-
-class CardDeck:
-    """Class to manage a collection of cards."""
-    
-    def __init__(self):
-        """Initialize the card deck with starting cards."""
-        self.__cards = []
-        self.__placed_cards = {
-            "Navigation": None,
-            "Collision_avoidance": None,
-            "Recovery": None
-        }
-        
-        # Preview mode state
-        self.__preview_mode = False
-        self.__hovered_card_index = -1
-        
-        # Debug-related variables - initialize based on debug settings
-        debug_settings = Config.get_debug_settings()
-        self.__show_hitbox = False  # Always start with hitbox hidden
-        self.__show_mouse_position = debug_settings['enabled']  # Show based on debug mode
-        
-        # Animation variables
-        self.__hover_animation_time = 0
-        
-        # Add initial test cards
-        self.__add_starting_cards()
-        
-        # Clear any cards in invalid states
-        self.__clear_unused_cards()
-    
-    def __add_starting_cards(self):
-        """Add initial cards to the deck for testing."""
-        # For now, just add the two test cards as specified
-        self.__cards.append(Card("Navigation", "A_Star"))
-        self.__cards.append(Card("Navigation", "Wall_Following"))
-        self.__cards.append(Card("Navigation", "RRT"))
-    
-        # In the future, add all 10 cards here
-    
-    def handle_events(self, events):
-        """Handle game events related to cards.
-        
-        Args:
-            events (list): List of pygame events
-        """
-        debug_settings = Config.get_debug_settings()
-        
-        for event in events:
-            # Toggle preview mode with spacebar
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    self.__toggle_preview_mode()
-                elif event.key == pygame.K_1 and debug_settings['enabled']:
-                    # Show hitbox when pressing 1 (only in debug mode)
-                    self.__show_hitbox = True
-                elif event.key == pygame.K_0 and debug_settings['enabled']:
-                    # Hide hitbox when pressing 0 (only in debug mode)
-                    self.__show_hitbox = False
-                elif event.key == pygame.K_m and debug_settings['enabled']:
-                    # Toggle mouse position display when pressing M (only in debug mode)
-                    self.__show_mouse_position = not self.__show_mouse_position
-            
-            # Handle mouse events
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self.__handle_mouse_down(event.pos)
-            
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                self.__handle_mouse_up()
-            
-            elif event.type == pygame.MOUSEMOTION:
-                self.__handle_mouse_motion(event.pos)
-    
-    def __toggle_preview_mode(self):
-        """Toggle between preview and normal modes."""
-        self.__preview_mode = not self.__preview_mode
-        
-        if self.__preview_mode:
-            # Get only cards not placed on the table
-            available_cards = []
-            for card in self.__cards:
-                if card.current_area == "deck" or card.current_area is None:
-                    available_cards.append(card)
-            
-            # Check if there are any available cards
-            if len(available_cards) == 0:
-                # If no available cards, exit preview mode immediately
-                self.__preview_mode = False
-                return
-            
-            # Set preview mode for each card
-            total_cards = len(available_cards)  # Calculate total number of cards
-            for i, card in enumerate(available_cards):
-                card.set_preview_mode(i, total_cards)  # Send total card count too
-        else:
-            for card in self.__cards:
-                card.exit_preview_mode()
-        
-        self.__hovered_card_index = -1
-    
-    def __handle_mouse_down(self, pos):
-        """Handle mouse button down event.
-        
-        Args:
-            pos (tuple): Mouse position (x, y)
-        """
-        if self.__preview_mode:
-            # Check if a card was clicked in preview mode
-            deck_cards = [card for card in self.__cards if card.current_area == "deck"]
-            
-            for i, card in enumerate(deck_cards):
-                if card.is_in_preview_area(pos, len(deck_cards)):
-                    # Get preview position for smooth transition
-                    preview_data = card._Card__calculate_preview_position(len(deck_cards))
-                    preview_pos = preview_data['pos']
-                    
-                    # Exit preview mode
-                    self.__preview_mode = False
-                    for c in self.__cards:
-                        c.exit_preview_mode()
-                    
-                    # Start dragging with special transition from preview position
-                    card.start_dragging_from_preview(pos, preview_pos)
-                    
-                    # Immediately update position to follow mouse for immediate feedback
-                    card.update_dragging(pos, self.__placed_cards)
-                    break
-        else:
-            # ONLY check placed cards - don't check deck cards at all in normal mode
-            handled = False
-            for area, card in self.__placed_cards.items():
-                if card and card.contains_point(pos):
-                    card.start_dragging(pos)
-                    handled = True
-                    break
-    
-    def __handle_mouse_up(self):
-        """Handle mouse button up event."""
-        for card in self.__cards:
-            if card.dragging:
-                card.stop_dragging()
-                self.__check_card_placement(card)
-    
-    def __handle_mouse_motion(self, pos):
-        """Handle mouse motion event.
-        
-        Args:
-            pos (tuple): Mouse position (x, y)
-        """
-        if self.__preview_mode:
-            # Get cards in the deck
-            deck_cards = [card for card in self.__cards if card.current_area == "deck"]
-            
-            # Reset all cards to not hovering first
-            for card in deck_cards:
-                card.hover_scale = 1.0
-            
-            # Find which card (if any) the mouse is hovering over
-            hover_found = False
-            hover_index = -1
-            
-            # First pass - find the first card that's being hovered over
-            for i, card in enumerate(deck_cards):
-                if card.is_in_preview_area(pos, len(deck_cards)):
-                    hover_found = True
-                    hover_index = i
-                    break  # Stop at the first card
-            
-            # Set the hovered card index
-            self.__hovered_card_index = hover_index
-            
-            # Second pass - set ONLY the hovered card's scale
-            if hover_index >= 0 and hover_index < len(deck_cards):
-                deck_cards[hover_index].hover_scale = Config.PREVIEW_HOVER_SCALE
-        else:
-            # Update dragging cards
-            for card in self.__cards:
-                if card.dragging:
-                    card.update_dragging(pos, self.__placed_cards)
-                    break
-            
-            # Update hover state for all cards
-            for card in self.__cards:
-                if not card.dragging:
-                    hovering = card.contains_point(pos)
-                    card.set_hovering(hovering)
-    
-    def __check_card_placement(self, card):
-        """Check if a card was placed in a valid area and handle overlapping.
-        
-        Args:
-            card (Card): The card that was placed
-        """
-        area = card.current_area
-        
-        # Check if card was placed in a gameplay area (not deck)
-        if area in ["Navigation", "Collision_avoidance", "Recovery"]:
-            # If there's already a card in this area, move it back to deck
-            if self.__placed_cards[area] is not None and self.__placed_cards[area] != card:
-                self.__placed_cards[area].current_area = "deck"
-            
-            # Update the placed card reference
-            self.__placed_cards[area] = card
-    
-    def update(self):
-        """Update card states."""
-        # Update animation states for all cards
-        for card in self.__cards:
-            card.update()
-    
-    def draw(self, surface):
-        """Draw all cards and areas on the given surface.
-        
-        Args:
-            surface (pygame.Surface): Surface to draw on
-        """
-        # Draw placement areas
-        self.__draw_placement_areas(surface)
-        
-        # Draw cards based on current mode
-        if self.__preview_mode:
-            # Draw darkened overlay
-            overlay = pygame.Surface(
-                (surface.get_width(), surface.get_height()), 
-                pygame.SRCALPHA
-            )
-            overlay.fill((0, 0, 0, 128))  # Semi-transparent black
-            surface.blit(overlay, (0, 0))
-            
-            # Draw cards that are placed on the table first
-            for area, card in self.__placed_cards.items():
-                if card is not None:
-                    card.draw(surface, self.__show_hitbox)
-            
-            # Then draw preview cards (cards not on the table)
-            for card in self.__cards:
-                if card.in_preview:
-                    card.draw(surface, self.__show_hitbox)
-        else:
-            # Show only cards being dragged and cards on the table
-            for card in self.__cards:
-                if card.dragging:
-                    card.draw(surface, self.__show_hitbox)
-            
-            for area, card in self.__placed_cards.items():
-                if card is not None and not card.dragging:
-                    card.draw(surface, self.__show_hitbox)
-        
-        # Display mouse position and debug info if enabled
-        debug_settings = Config.get_debug_settings()
-        if debug_settings['enabled'] and self.__show_mouse_position:
-            self.__draw_mouse_position(surface)
-
-    def __draw_placement_areas(self, surface):
-        """Draw all card placement areas with labels."""
-        # Get window dimensions
-        window_width, window_height = Config.get_window_dimensions()
-        card_width, card_height = Config.get_card_dimensions(window_width)
-        valid_width, valid_height = Config.get_valid_area_dimensions(card_width, card_height)
-        
-        # Get positions and labels
-        positions = Config.get_area_positions(window_width, window_height)
-        labels = Config.get_area_labels()
-        
-        # Create font for labels
-        font = pygame.font.SysFont(None, 32)
-        
-        # Check if any card is being dragged and get its type
-        dragging_card = None
-        card_type = None
-        for card in self.__cards:
-            if card.dragging:
-                dragging_card = card
-                card_type = card.card_type
-                break
-        
-        # Draw each area (except deck)
-        for area_name, position in positions.items():
-            if area_name == "deck":
-                continue  # Skip drawing deck area completely
-            
-            # Create rectangle for area
-            area_rect = pygame.Rect(
-                position[0] - valid_width//2,
-                position[1] - valid_height//2,
-                valid_width,
-                valid_height
-            )
-            
-            # Draw area background and border based on state
-            if self.__placed_cards[area_name] is not None:
-                if dragging_card and dragging_card.hovering_area == area_name and dragging_card.hovering_over_card:
-                    # Card is being dragged over area that already has a card - highlight with darker gray
-                    pygame.draw.rect(surface, (100, 100, 100, 240), area_rect)  # Darker gray when about to replace a card
-                else:
-                    # Area contains a card and not being replaced
-                    pygame.draw.rect(surface, Config.BACKGROUND_COLOR, area_rect)
-            elif dragging_card and dragging_card.hovering_area == area_name:
-                # Card is being dragged over this area - Increased gray intensity
-                pygame.draw.rect(surface, (120, 120, 120, 240), area_rect)  # Increased gray intensity
-            elif dragging_card and area_name == card_type:
-                # This is a valid area for the card type being dragged
-                pygame.draw.rect(surface, (150, 150, 150, 200), area_rect)  # Increased gray intensity
-            else:
-                # Empty area - lighter green color
-                pygame.draw.rect(surface, (80, 130, 100), area_rect)
-            
-            # Draw inner border with spacing from outer edge
-            inner_rect = pygame.Rect(
-                area_rect.left + 8,  # Add spacing from left border
-                area_rect.top + 8,   # Add spacing from top border
-                area_rect.width - 16, # Reduce width on both left and right
-                area_rect.height - 16 # Reduce height on both top and bottom
-            )
-            pygame.draw.rect(surface, Config.HIGHLIGHT_COLOR, inner_rect, 3)
-            
-            # Draw label above the area
-            label_text = labels[area_name]
-            label_surface = font.render(label_text, True, Config.WHITE_COLOR)
-            label_rect = label_surface.get_rect(
-                centerx=position[0], 
-                bottom=position[1] - valid_height//2 - 10
-            )
-            surface.blit(label_surface, label_rect)
-            
-            # Draw type name below the area
-            type_surface = font.render(area_name, True, Config.WHITE_COLOR)
-            type_rect = type_surface.get_rect(
-                centerx=position[0], 
-                top=position[1] + valid_height//2 + 10
-            )
-            surface.blit(type_surface, type_rect)
-
-    def __clear_unused_cards(self):
-        """Find and clear any cards that might be in invalid states."""
-        # Reset all cards not in play areas to deck
-        for card in self.__cards:
-            if card.current_area not in ["Navigation", "Collision_avoidance", "Recovery"]:
-                card.current_area = "deck"
+    @hovering_over_card.setter
+    def hovering_over_card(self, value):
+        """Set whether the card is hovering over another card."""
+        self.__hovering_over_card = value
 
     @property
-    def show_hitbox(self):
-        """Get the current hitbox display state."""
-        return self.__show_hitbox
+    def image(self):
+        """Get the card's image."""
+        return self.__image
+    
+    @property
+    def shadow(self):
+        """Get the card's shadow."""
+        return self.__shadow
+    
+    @property
+    def width(self):
+        """Get the card's width."""
+        return self.__width
+    
+    @property
+    def height(self):
+        """Get the card's height."""
+        return self.__height
+    
+    @property
+    def prev_preview_position(self):
+        """Get the card's previous preview position."""
+        return self.__prev_preview_position
 
-    def __draw_mouse_position(self, surface):
-        """Display mouse position and debug information on screen.
-        
-        Args:
-            surface (pygame.Surface): Surface to draw on
-        """
-        # Check if debug mode is enabled
-        debug_settings = Config.get_debug_settings()
-        if not debug_settings['enabled']:
-            return
-        
-        # Get current mouse position
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        
-        # Create font for text display
-        font = pygame.font.SysFont(None, debug_settings['font_size'])
-        
-        # Create information text lines
-        lines = []
-        lines.append(f"Mouse: X = {mouse_x}, Y = {mouse_y}")
-        
-        if self.__preview_mode:
-            lines.append(f"Mode: Preview (displaying cards)")
-            if self.__hovered_card_index >= 0:
-                lines.append(f"Hovering card #{self.__hovered_card_index}")
-        else:
-            lines.append("Mode: Normal (card placement)")
-        
-        # Add key command instructions
-        lines.append("Press SPACE = toggle mode, 1 = show hitbox, 0 = hide hitbox, M = toggle debug info")
-        
-        # Draw each line
-        for i, line in enumerate(lines):
-            # Create text surface
-            text_surface = font.render(line, True, debug_settings['text_color'])
-            text_rect = text_surface.get_rect(
-                topleft=(
-                    debug_settings['padding'], 
-                    debug_settings['padding'] + i * debug_settings['line_height']
-                )
-            )
-            
-            # Draw semi-transparent background
-            bg_rect = text_rect.inflate(20, 10)
-            bg_rect.topleft = (text_rect.left - 10, text_rect.top - 5)
-            pygame.draw.rect(surface, debug_settings['bg_color'], bg_rect)
-            
-            # Draw text
-            surface.blit(text_surface, text_rect)
+    @property
+    def animation_progress(self):
+        """Get the card's animation progress."""
+        return self.__animation_progress
+
+    @property
+    def rect(self):
+        """Get the card's rectangle."""
+        return self.__rect
 
 
 def main():
