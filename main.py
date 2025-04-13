@@ -2,7 +2,7 @@
 Main module for the card game.
 Handles game initialization and main loop.
 """
-from game_manager import GameManager
+from gameManager import GameManager
 
 def main():
     """Main function to run the card game."""

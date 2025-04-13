@@ -253,7 +253,7 @@ class Card:
         """
         # Get base settings for preview
         window_width, window_height = Config.get_window_dimensions()
-        center_x = window_width // 2  # Always center horizontally
+        center_x = window_width // 2 + 100  # ขยับจุดกลางไปทางขวา 200 พิกเซล
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)

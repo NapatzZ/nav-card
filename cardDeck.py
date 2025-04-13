@@ -11,7 +11,11 @@ class CardDeck:
     def __init__(self, stage):
         """Initialize the card deck with starting cards."""
         self.__cards = []
-        self.__placed_cards = {}
+        self.__placed_cards = {
+            "Navigation": None,
+            "Collision_avoidance": None, 
+            "Recovery": None
+        }  # เปลี่ยนเป็น dictionary ที่ key คือพื้นที่ และ value คือการ์ด
         
         # Store reference to stage
         self.stage = stage
@@ -40,8 +44,8 @@ class CardDeck:
         # กำหนดการ์ดทั้งหมดที่นี่
         cards_to_add = [
             # Navigation cards
-            ("Navigation", "A_Star"),
-            ("Navigation", "Wall_Following"),
+            ("Navigation", "AStar"),
+            ("Navigation", "WallFollowing"),
             ("Navigation", "RRT"),
             
             # Collision_avoidance cards
@@ -150,9 +154,10 @@ class CardDeck:
                     break
         else:
             print("[Normal Mode] Checking for card click...")
-            for area, card in self.__placed_cards.items():
-                if card and card.contains_point(pos):
-                    print(f"[Normal Mode] Card clicked: {card.card_type} - {card.card_name} in {area}")
+            # ตรวจสอบการ์ดที่วางบนโต๊ะ (ใช้ loop ผ่าน cards แทนที่จะใช้ __placed_cards)
+            for card in self.__cards:
+                if card.current_area in ["Navigation", "Collision_avoidance", "Recovery"] and card.contains_point(pos):
+                    print(f"[Normal Mode] Card clicked: {card.card_type} - {card.card_name} in {card.current_area}")
                     card.start_dragging(pos)
                     break
     
@@ -236,29 +241,25 @@ class CardDeck:
         # พยายามวางการ์ด
         if self.stage.place_card(card, current_position):
             print("[Card Placement Check] Card placed successfully")
+            
             # อัปเดต current_area ตาม hovering_area
             if card.hovering_area:
                 card.current_area = card.hovering_area
                 
-                # ลบการ์ดอื่นๆ ที่อาจวางอยู่ในพื้นที่เดียวกัน
-                cards_to_remove = []
-                for existing_card, area in self.__placed_cards.items():
-                    if area == card.hovering_area and existing_card != card:
-                        print(f"[Card Placement Check] Removing old card from __placed_cards: {existing_card.card_name}")
-                        cards_to_remove.append(existing_card)
+                # ลบการ์ดเก่าจาก placed_cards (ถ้ามี)
+                old_card = self.__placed_cards[card.hovering_area]
+                if old_card is not None and old_card != card:
+                    print(f"[Card Placement Check] Removing old card: {old_card.card_name} from {card.hovering_area}")
                 
-                # ลบการ์ดที่ต้องลบออกจาก __placed_cards
-                for remove_card in cards_to_remove:
-                    if remove_card in self.__placed_cards:
-                        del self.__placed_cards[remove_card]
-                
-                # อัปเดตการ์ดที่วางแล้ว
-                self.__placed_cards[card] = card.hovering_area
-                print(f"[Card Placement Check] Updated __placed_cards with {card.card_name}")
+                # อัปเดตการ์ดใหม่ใน placed_cards
+                self.__placed_cards[card.hovering_area] = card
+                print(f"[Card Placement Check] Updated __placed_cards: {card.hovering_area} = {card.card_name}")
             else:
                 print(f"[Card Placement Check] No hovering area found, using slot position")
-                # อัปเดตการ์ดที่วางแล้ว
-                self.__placed_cards[card] = card.current_area
+                # หาพื้นที่จาก current_area ที่อัปเดตโดย place_card
+                if card.current_area in self.__placed_cards:
+                    self.__placed_cards[card.current_area] = card
+                    print(f"[Card Placement Check] Updated __placed_cards: {card.current_area} = {card.card_name}")
         else:
             print("[Card Placement Check] Card placement failed, returning to deck")
             # คืนการ์ดกลับไปที่ deck
@@ -285,7 +286,7 @@ class CardDeck:
         dragging_any_card = any(card.dragging for card in self.__cards)
         
         # วาดการ์ดที่วางแล้ว
-        for card, area in self.__placed_cards.items():
+        for area, card in self.__placed_cards.items():
             if card is not None and not card.dragging:
                 card.draw(screen)
 
@@ -330,12 +331,16 @@ class CardDeck:
         # Get current mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
         
+        # ใช้ค่าเดียวกับในเมธอด __calculate_preview_position
+        center_x_value = 800  # ค่าคงที่เดียวกับที่ใช้ในการคำนวณตำแหน่ง
+        
         # Create font for text display
         font = pygame.font.SysFont(None, debug_settings['font_size'])
         
         # Create information text lines
         lines = []
         lines.append(f"Mouse: X = {mouse_x}, Y = {mouse_y}")
+        lines.append(f"Center X: {center_x_value}")
         
         if self.__preview_mode:
             lines.append(f"Mode: Preview (displaying cards)")
@@ -379,7 +384,9 @@ class CardDeck:
         """
         # Get base settings for preview
         window_width, window_height = Config.get_window_dimensions()
-        center_x = window_width // 2
+        
+        # ใช้ค่าคงที่เป็นตำแหน่งจริงเลย ไม่คำนวณจากขนาดหน้าจอ
+        center_x = (window_width // 2 )  # ตำแหน่งทางขวา ปรับตามต้องการ
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)
@@ -390,7 +397,7 @@ class CardDeck:
         # Single card case - center with no rotation
         if total_cards <= 1:
             return {
-                'pos': (center_x, center_y - 50),
+                'pos': (center_x, center_y - 50),  # ใช้ center_x ที่ปรับแล้ว
                 'rotation': 0,
                 'scale': card.hover_scale,
                 'hover_offset': 0 if card.hover_scale == 1.0 else -30,
@@ -459,6 +466,9 @@ class CardDeck:
             x += hover_offset_x
             y += hover_offset_y
             hover_offset = hover_distance
+        
+        # ขยับตำแหน่ง x เพิ่ม offset ตรงๆ
+        x += 200
         
         return {
             'pos': (x, y),
