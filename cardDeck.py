@@ -137,6 +137,16 @@ class CardDeck:
                     # เก็บตำแหน่งเริ่มต้นสำหรับอนิเมชั่น
                     card.start_dragging_from_preview(pos, preview_pos)
                     card.update_dragging(pos)
+                    
+                    # ปิดโหมด preview แต่ยังคงเก็บการลากการ์ดปัจจุบันไว้
+                    self.__preview_mode = False
+                    self.__deck_visible = False
+                    
+                    # ออกจาก preview สำหรับการ์ดอื่นๆ ทั้งหมด
+                    for other_card in self.__cards:
+                        if other_card != card and other_card.in_preview:
+                            other_card.exit_preview_mode()
+                            
                     break
         else:
             print("[Normal Mode] Checking for card click...")
@@ -195,7 +205,6 @@ class CardDeck:
                     card.update_dragging(pos)
                     # ส่งการ์ดไปให้ stage ตรวจสอบ
                     self.stage.handle_card_drag(card, pos)
-                    break
             
             # Update hover state for all cards
             for card in self.__cards:
@@ -222,8 +231,22 @@ class CardDeck:
             # อัปเดต current_area ตาม hovering_area
             if card.hovering_area:
                 card.current_area = card.hovering_area
+                
+                # ลบการ์ดอื่นๆ ที่อาจวางอยู่ในพื้นที่เดียวกัน
+                cards_to_remove = []
+                for existing_card, area in self.__placed_cards.items():
+                    if area == card.hovering_area and existing_card != card:
+                        print(f"[Card Placement Check] Removing old card from __placed_cards: {existing_card.card_name}")
+                        cards_to_remove.append(existing_card)
+                
+                # ลบการ์ดที่ต้องลบออกจาก __placed_cards
+                for remove_card in cards_to_remove:
+                    if remove_card in self.__placed_cards:
+                        del self.__placed_cards[remove_card]
+                
                 # อัปเดตการ์ดที่วางแล้ว
                 self.__placed_cards[card] = card.hovering_area
+                print(f"[Card Placement Check] Updated __placed_cards with {card.card_name}")
         else:
             print("[Card Placement Check] Card placement failed, returning to deck")
             # คืนการ์ดกลับไปที่ deck
@@ -235,19 +258,39 @@ class CardDeck:
         # Update animation states for all cards
         for card in self.__cards:
             card.update()
+            
+        # อัปเดตตำแหน่งการ์ดที่กำลังลาก
+        mouse_pos = pygame.mouse.get_pos()
+        for card in self.__cards:
+            if card.dragging:
+                card.update_dragging(mouse_pos)
+                # ส่งการ์ดไปให้ stage ตรวจสอบ
+                self.stage.handle_card_drag(card, mouse_pos)
     
     def draw(self, screen):
         """Draw the deck and all cards."""
+        # ตรวจสอบว่ามีการลากการ์ดอยู่หรือไม่
+        dragging_any_card = any(card.dragging for card in self.__cards)
+        
         # วาดการ์ดที่วางแล้ว
         for card, area in self.__placed_cards.items():
             if card is not None and not card.dragging:
                 card.draw(screen)
 
-        # วาดการ์ดใน deck เฉพาะเมื่ออยู่ใน preview mode
-        if self.__preview_mode:
+        # วาดการ์ดใน deck เฉพาะเมื่ออยู่ใน preview mode และไม่มีการลากการ์ดใดๆ
+        if self.__preview_mode and not dragging_any_card:
             for card in self.__cards:
                 if card is not None and not card.dragging and card.in_preview:
                     card.draw(screen)
+                    
+        # วาดการ์ดที่กำลังลากอยู่ (แสดงทับการ์ดอื่นๆ)
+        for card in self.__cards:
+            if card is not None and card.dragging:
+                card.draw(screen)
+
+        # แสดงข้อมูล debug ถ้าเปิดใช้งาน
+        if self.__show_mouse_position:
+            self.__draw_mouse_position(screen)
 
     def __clear_unused_cards(self):
         """Find and clear any cards that might be in invalid states."""
@@ -557,26 +600,3 @@ class CardDeck:
     def cards(self):
         """Get all cards in the deck."""
         return self.__cards
-
-    def update_dragging(self, mouse_pos: tuple[int, int]):
-        """อัพเดทตำแหน่งการ์ดที่กำลังลาก"""
-        if self.__dragging_card:
-            # อัพเดทตำแหน่งการ์ด
-            self.__dragging_card.position = mouse_pos
-            
-            # ตรวจสอบว่าการ์ดอยู่ในพื้นที่ valid หรือไม่
-            hovering_area = None
-            hovering_over_card = False
-            
-            # ตรวจสอบกับ stage ก่อน
-            if self.stage:
-                for slot in self.stage.slots:
-                    if slot.valid_area_rect.collidepoint(mouse_pos):
-                        hovering_area = slot.card_type.value
-                        if slot.card is not None:
-                            hovering_over_card = True
-                        break
-            
-            # อัพเดทสถานะ hovering ของการ์ด
-            self.__dragging_card.hovering_area = hovering_area
-            self.__dragging_card.hovering_over_card = hovering_over_card

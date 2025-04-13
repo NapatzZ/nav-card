@@ -139,10 +139,13 @@ class CardSlot:
             return False
             
         # ถ้ามีการ์ดอยู่แล้ว ให้คืนการ์ดเก่ากลับไปที่ deck
+        removed_card = None
         if self.card is not None:
             print(f"[CardSlot] Returning old card: {self.card.card_name} to deck")
-            self.card.current_area = "deck"
-            self.card.position = self.card.original_position
+            removed_card = self.card
+            removed_card.current_area = "deck"
+            removed_card.position = removed_card.original_position
+            self.card = None  # ลบการ์ดเก่าออกจากช่องก่อน
             
         # วางการ์ดใหม่
         print(f"[CardSlot] Placing new card: {card.card_name} in slot: {self.card_type.value}")
@@ -150,6 +153,7 @@ class CardSlot:
         card.rect.center = self.rect.center
         card.position = self.rect.center
         card.current_area = self.card_type.value
+        
         return True
 
     def remove_card(self) -> Optional[Card]:
@@ -229,12 +233,15 @@ class Stage:
                     print("[Stage] Slot can accept card, placing...")
                     # ถ้ามีการ์ดเก่าอยู่ ให้คืนกลับไปที่ deck
                     if slot.card is not None:
-                        print(f"[CardSlot] Returning old card: {slot.card.card_name} to deck")
-                        slot.card.current_area = "deck"
-                        slot.card.position = slot.card.original_position
+                        print(f"[Stage] Returning old card: {slot.card.card_name} to deck")
+                        old_card = slot.card
+                        old_card.current_area = "deck"
+                        old_card.position = old_card.original_position
+                        # ทำให้แน่ใจว่าการ์ดเก่าถูกลบออกจาก slot ก่อนวางการ์ดใหม่
+                        slot.card = None
                     
                     # วางการ์ดใหม่
-                    print(f"[CardSlot] Placing new card: {card.card_name} in slot: {slot.card_type}")
+                    print(f"[Stage] Placing new card: {card.card_name} in slot: {slot.card_type}")
                     slot.card = card
                     card.position = slot.rect.center
                     print("[Stage] Card placement successful")

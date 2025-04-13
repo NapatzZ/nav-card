@@ -571,6 +571,9 @@ class Card:
         self.__dragging = True
         self.__original_position = self.__position
         self.__current_area = None
+        
+        # เมื่อเริ่มลากการ์ดจากโหมด preview ให้ออกจากโหมด preview
+        self.__in_preview = False
     
     @property
     def hovering_area(self):
