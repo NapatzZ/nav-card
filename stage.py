@@ -206,15 +206,21 @@ class Stage:
         print(f"\n[Stage] Handling card drag: {card.card_type} - {card.card_name}")
         print(f"[Stage] Mouse position: {mouse_pos}")
         
+        card.hovering_area = None  # รีเซ็ตค่าเริ่มต้น
+        card.hovering_over_card = False
+        
         # ตรวจสอบว่าการ์ดอยู่เหนือช่องใดๆ
         for slot in self.slots:
+            # ตรวจสอบทุกช่องเพื่อแสดง debug info
             if slot.valid_area_rect.collidepoint(mouse_pos):
                 print(f"[Stage] Card is over slot: {slot.card_type}")
                 # ตรวจสอบว่าการ์ดสามารถวางในช่องนี้ได้
                 if slot.can_accept_card(card):
                     print("[Stage] Slot can accept card")
-                    card.hovering_area = slot.card_type
-                    return
+                    card.hovering_area = slot.card_type.value
+                    if slot.card is not None:
+                        card.hovering_over_card = True
+                    return  # ออกจากฟังก์ชันเมื่อพบช่องที่เหมาะสม
         
         # ถ้าไม่พบช่องที่เหมาะสม
         card.hovering_area = None
@@ -224,10 +230,13 @@ class Stage:
         print(f"\n[Stage] Attempting to place card: {card.card_type} - {card.card_name}")
         print(f"[Stage] At position: {position}")
         
-        # หาช่องที่เหมาะสม
+        # ตรวจสอบตำแหน่งกับทุกช่อง
+        found_valid_slot = False
         for slot in self.slots:
             if slot.valid_area_rect.collidepoint(position):
+                found_valid_slot = True
                 print(f"[Stage] Found slot: {slot.card_type}")
+                
                 # ตรวจสอบว่าการ์ดสามารถวางในช่องนี้ได้
                 if slot.can_accept_card(card):
                     print("[Stage] Slot can accept card, placing...")
@@ -248,9 +257,9 @@ class Stage:
                     return True
                 else:
                     print(f"[Stage] Card type mismatch: {card.card_type} cannot be placed in {slot.card_type}")
-                    return False
         
-        print("[Stage] No valid slot found")
+        if not found_valid_slot:
+            print("[Stage] No valid slot found at position", position)
         return False
 
     def get_slot_at_position(self, pos: Tuple[int, int]) -> Optional[CardSlot]:
