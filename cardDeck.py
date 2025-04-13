@@ -165,8 +165,15 @@ class CardDeck:
                 print(f"[Card Placement] Current position: {card.position}")
                 print(f"[Card Placement] Current area: {card.current_area}")
                 print(f"[Card Placement] Hovering area: {card.hovering_area}")
-                card.stop_dragging()
-                self.__check_card_placement(card)
+                
+                # เก็บตำแหน่งปัจจุบันก่อนเรียก stop_dragging
+                current_position = card.position
+                
+                # หยุดการลาก (แต่ไม่ต้องรีเซ็ตตำแหน่ง)
+                card.stop_dragging(reset_position=False)
+                
+                # ตรวจสอบการวางการ์ดที่ตำแหน่งปัจจุบัน
+                self.__check_card_placement(card, current_position)
     
     def __handle_mouse_motion(self, pos):
         """Handle mouse motion event.
@@ -212,11 +219,12 @@ class CardDeck:
                     hovering = card.contains_point(pos)
                     card.set_hovering(hovering)
     
-    def __check_card_placement(self, card: Card):
+    def __check_card_placement(self, card: Card, current_position):
         """ตรวจสอบการวางการ์ด"""
         print(f"\n[Card Placement Check] Card: {card.card_type} - {card.card_name}")
-        print(f"[Card Placement Check] Position: {card.position}")
+        print(f"[Card Placement Check] Position: {current_position}")
         print(f"[Card Placement Check] Stage exists: {self.stage is not None}")
+        print(f"[Card Placement Check] Hovering area: {card.hovering_area}")
         
         # ถ้าไม่มี stage หรือการ์ดไม่ได้อยู่เหนือช่องใดๆ
         if not self.stage:
@@ -226,7 +234,7 @@ class CardDeck:
             return
 
         # พยายามวางการ์ด
-        if self.stage.place_card(card, card.position):
+        if self.stage.place_card(card, current_position):
             print("[Card Placement Check] Card placed successfully")
             # อัปเดต current_area ตาม hovering_area
             if card.hovering_area:
@@ -247,6 +255,10 @@ class CardDeck:
                 # อัปเดตการ์ดที่วางแล้ว
                 self.__placed_cards[card] = card.hovering_area
                 print(f"[Card Placement Check] Updated __placed_cards with {card.card_name}")
+            else:
+                print(f"[Card Placement Check] No hovering area found, using slot position")
+                # อัปเดตการ์ดที่วางแล้ว
+                self.__placed_cards[card] = card.current_area
         else:
             print("[Card Placement Check] Card placement failed, returning to deck")
             # คืนการ์ดกลับไปที่ deck

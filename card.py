@@ -126,11 +126,18 @@ class Card:
         self.__original_position = self.__position
         self.__current_area = None
     
-    def stop_dragging(self):
-        """Stop dragging the card."""
+    def stop_dragging(self, reset_position=True):
+        """Stop dragging the card.
+        
+        Args:
+            reset_position (bool): Whether to reset position to original position
+        """
         self.__dragging = False
-        self.__position = self.__original_position
-        self.__update_position()
+        
+        # รีเซ็ตตำแหน่งเมื่อต้องการเท่านั้น
+        if reset_position:
+            self.__position = self.__original_position
+            self.__update_position()
     
     def update_dragging(self, mouse_pos):
         """Update card position while dragging.
