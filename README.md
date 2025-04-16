@@ -143,10 +143,11 @@ The game includes various algorithm cards that players can choose from:
 - **Dijkstra** - A classic pathfinding algorithm that guarantees the shortest path
 - **RRT (Rapidly-exploring Random Tree)** - A randomized algorithm for efficient space exploration
 - **Greedy Search** - A fast but potentially suboptimal pathfinding approach
+- **DWA (Dynamic Window Approach)** - 
+- **Wall Following** - 
 
 ### Collision Avoidance Algorithms
-- **DWA (Dynamic Window Approach)** - Considers robot dynamics for smooth obstacle avoidance
-- **Wall Following** - A simple algorithm that follows walls to navigate around obstacles
+
 
 ### Recovery Behaviors
 - Various strategies for recovering from stuck situations or collisions
