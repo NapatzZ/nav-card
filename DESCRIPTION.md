@@ -214,7 +214,7 @@ Three graphs will be generated:
 | Final Week | Polish user interface, finalize documentation |
 
 ## 6. Document Version
-Version: 1.0
+Version: 0.5
 
 ## 7. Statistical Data Revision
 
@@ -233,42 +233,6 @@ We focus on "Algorithm Performance" with:
 | Recovery Attempts | Show recovery frequency by location | Heatmap | X Position | Y Position |
 | Path Efficiency | Track improvement over time | Line graph | Attempt Number | Path Length Ratio |
 
-## 8. Project Planning
-
-### 8.1 Weekly Planning
-**March 26 – April 2**:
-Finalize project structure; set up basic user interface (window, card deck, stage); begin implementing core classes.
-
-**April 3 – April 9**:
-Complete Card and CardDeck classes; implement card dragging and positioning; create preview mode visualization.
-
-**April 10 – April 16 (50% Milestone)**:
-Ensure all core classes are functional; validate card placement logic; implement camera transitions between card selection and game stage; basic gameplay loop operates correctly.
-
-**April 17 – April 23**:
-Begin implementing robot navigation visualization based on selected cards; add data collection framework; create stage obstacles and goal visualization.
-
-**April 24 – May 11**:
-Finalize data presentation (tables and graphs for algorithm performance); complete UI polishing; perform comprehensive testing and debugging; prepare final documentation.
-
-### 8.2 50% of Tasks by April 16
-**By April 16 (50% Completion)**:
-- Core classes (GameManager, Card, CardDeck, Stage) are operational
-- Card selection, dragging, and placement functionality implemented
-- Preview mode (fan-out display) is working
-- Camera transition between selection and gameplay screens
-- Basic UI elements (buttons, card slots) are functional
-
-**By April 23 (75% Completion)**:
-- Robot navigation visualization based on selected algorithms
-- Initial implementation of data collection framework
-- Stage environment with obstacles and goal position
-
-**By May 11 (Final 25% Completion)**:
-- Complete data visualization components
-- Finalize robot navigation simulation
-- Comprehensive testing, debugging, and documentation
-- Final project submission with all deliverables
 
 ## GitHub Repository
 https://github.com/NapatzZ/nav-card 
