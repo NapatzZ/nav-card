@@ -40,8 +40,8 @@ class Config:
     
     # Valid placement areas
     VALID_AREA_SCALE = 1.4  # 140% of card size
-    VALID_AREA_PADDING = 20  # เพิ่มระยะห่างจากขอบ
-    VALID_AREA_ALPHA = 200  # ความโปร่งใสของ valid area
+    VALID_AREA_PADDING = 20  # Additional padding from edges
+    VALID_AREA_ALPHA = 200  # Transparency of valid area
     
     # Preview settings
     PREVIEW_RADIUS_RATIO = 0.3  # 30% of window width
@@ -89,7 +89,7 @@ class Config:
         # Use the ratio 1/6, 3/6, 5/6 of the screen width
         return {
             "Navigation": (int(window_width * (1/6)), window_height // 2),  # Left
-            "Collision_avoidance": (int(window_width * (3/6)), window_height // 2),  # Center
+            "Collision avoidance": (int(window_width * (3/6)), window_height // 2),  # Center
             "Recovery": (int(window_width * (5/6)), window_height // 2),  # Right
             "deck": (int(window_width * 0.5), int(window_height * 0.85))  # Bottom
         }
@@ -99,7 +99,7 @@ class Config:
         """Get labels for card placement areas."""
         return {
             "Navigation": "Navigation",
-            "Collision_avoidance": "Collision_avoidance",
+            "Collision avoidance": "Collision avoidance",
             "Recovery": "Recovery"
         }
     
@@ -131,14 +131,14 @@ class Config:
     @staticmethod
     def get_card_types():
         """Get valid card types."""
-        return ["Navigation", "Collision_avoidance", "Recovery"]
+        return ["Navigation", "Collision avoidance", "Recovery"]
     
     @staticmethod
     def get_card_names():
         """Get valid card names for each type."""
         return {
-            "Navigation": ["AStar", "WallFollowing", "RRT", "GreedySearch", "Dijkstra"],
-            "Collision_avoidance": ["DWA", "Bug", "VFH"],
+            "Navigation": ["AStar", "WallFollowing", "RRT", "GreedySearch", "Dijkstra", "DWA"],
+            "Collision avoidance": [ "Bug", "VFH"],
             "Recovery": ["SpinInPlace", "StepBack"]
         }
     

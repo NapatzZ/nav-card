@@ -13,9 +13,9 @@ class CardDeck:
         self.__cards = []
         self.__placed_cards = {
             "Navigation": None,
-            "Collision_avoidance": None, 
+            "Collision avoidance": None, 
             "Recovery": None
-        }  # เปลี่ยนเป็น dictionary ที่ key คือพื้นที่ และ value คือการ์ด
+        }  # Changed to dictionary where key is area and value is card
         
         # Store reference to stage
         self.stage = stage
@@ -23,7 +23,10 @@ class CardDeck:
         # Preview mode state
         self.__preview_mode = False
         self.__hovered_card_index = -1
-        self.__deck_visible = False  # เพิ่มตัวแปรเก็บสถานะการมองเห็นของ deck
+        self.__deck_visible = False  # Variable to store deck visibility state
+        
+        # Game stage state (variable to track if we're in game mode)
+        self.__in_game_stage = False
         
         # Debug-related variables
         debug_settings = Config.get_debug_settings()
@@ -40,14 +43,14 @@ class CardDeck:
         self.__clear_unused_cards()
     
     def reset_cards(self):
-        """รีเซ็ตการ์ดทั้งหมดกลับสู่ deck"""
+        """Reset all cards back to the deck."""
         print("[CardDeck] Resetting all cards to deck")
         
-        # รีเซ็ต placed_cards dictionary
+        # Reset placed_cards dictionary
         for area in self.__placed_cards:
             self.__placed_cards[area] = None
         
-        # รีเซ็ตสถานะของทุกการ์ด
+        # Reset state of all cards
         for card in self.__cards:
             card.current_area = "deck"
             card.position = card.original_position
@@ -56,24 +59,30 @@ class CardDeck:
             card.hovering_area = None
             card.hovering_over_card = False
         
-        # ปิดโหมด preview
+        # Close preview mode
         self.__preview_mode = False
         self.__deck_visible = False
         self.__hovered_card_index = -1
+        
+        # Reset game state (back to card selection mode)
+        self.__in_game_stage = False
     
     def __add_starting_cards(self):
         """Add initial cards to the deck for testing."""
-        # กำหนดการ์ดทั้งหมดที่นี่
+        # Define all cards here
         cards_to_add = [
             # Navigation cards
             ("Navigation", "AStar"),
             ("Navigation", "WallFollowing"),
             ("Navigation", "RRT"),
+            ("Navigation", "Dijkstra"),
+            ("Navigation", "GreedySearch"),
+            ("Navigation", "DWA")
             
-            # Collision_avoidance cards
-           #  ("Collision_avoidance", "Potential_Field"),
-          #   ("Collision_avoidance", "Dynamic_Window"),
-          #   ("Collision_avoidance", "Velocity_Obstacle"),
+            # Collision avoidance cards
+           #  ("Collision avoidance", "Potential_Field"),
+          #   ("Collision avoidance", "Dynamic_Window"),
+          #   ("Collision avoidance", "Velocity_Obstacle"),
             
             # Recovery cards
          #    ("Recovery", "Backup"),
@@ -83,7 +92,7 @@ class CardDeck:
 
         for card_type, card_name in cards_to_add:
             card = Card(card_type, card_name)
-            # ไม่ต้องกำหนดตำแหน่งเริ่มต้น เพราะจะแสดงเฉพาะตอน fanout
+            # No need to set initial position as they will only be shown during fanout
             card.current_area = "deck"
             self.__cards.append(card)
     
@@ -96,9 +105,9 @@ class CardDeck:
         debug_settings = Config.get_debug_settings()
         
         for event in events:
-            # Toggle preview mode with spacebar
+            # Toggle preview mode with spacebar (only if not in game stage)
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE and not self.__in_game_stage:
                     self.__toggle_preview_mode()
                 elif event.key == pygame.K_1 and debug_settings['enabled']:
                     self.__show_hitbox = True
@@ -160,15 +169,15 @@ class CardDeck:
                     preview_data = card._Card__calculate_preview_position(len(deck_cards))
                     preview_pos = preview_data['pos']
                     
-                    # เก็บตำแหน่งเริ่มต้นสำหรับอนิเมชั่น
+                    # Store initial position for animation
                     card.start_dragging_from_preview(pos, preview_pos)
                     card.update_dragging(pos)
                     
-                    # ปิดโหมด preview แต่ยังคงเก็บการลากการ์ดปัจจุบันไว้
+                    # Close preview mode but keep current dragging card
                     self.__preview_mode = False
                     self.__deck_visible = False
                     
-                    # ออกจาก preview สำหรับการ์ดอื่นๆ ทั้งหมด
+                    # Exit preview for all other cards
                     for other_card in self.__cards:
                         if other_card != card and other_card.in_preview:
                             other_card.exit_preview_mode()
@@ -176,9 +185,9 @@ class CardDeck:
                     break
         else:
             print("[Normal Mode] Checking for card click...")
-            # ตรวจสอบการ์ดที่วางบนโต๊ะ (ใช้ loop ผ่าน cards แทนที่จะใช้ __placed_cards)
+            # Check cards placed on the table (loop through cards instead of using __placed_cards)
             for card in self.__cards:
-                if card.current_area in ["Navigation", "Collision_avoidance", "Recovery"] and card.contains_point(pos):
+                if card.current_area in ["Navigation", "Collision avoidance", "Recovery"] and card.contains_point(pos):
                     print(f"[Normal Mode] Card clicked: {card.card_type} - {card.card_name} in {card.current_area}")
                     card.start_dragging(pos)
                     break
@@ -193,14 +202,23 @@ class CardDeck:
                 print(f"[Card Placement] Current area: {card.current_area}")
                 print(f"[Card Placement] Hovering area: {card.hovering_area}")
                 
-                # เก็บตำแหน่งปัจจุบันก่อนเรียก stop_dragging
+                # Store current position before calling stop_dragging
                 current_position = card.position
                 
-                # หยุดการลาก (แต่ไม่ต้องรีเซ็ตตำแหน่ง)
-                card.stop_dragging(reset_position=False)
+                # Try to place card on stage - pass (0, 0) as camera offset since events are already adjusted
+                if self.__check_card_placement(card, current_position):
+                    # Stop dragging without resetting position (card will be in placed area)
+                    card.stop_dragging(reset_position=False)
+                else:
+                    # Stop dragging and reset position (card will go back to original)
+                    card.stop_dragging(reset_position=True)
                 
-                # ตรวจสอบการวางการ์ดที่ตำแหน่งปัจจุบัน
-                self.__check_card_placement(card, current_position)
+                # Return hovering
+                card.hovering_area = None
+                card.hovering_over_card = False
+                
+                # Exit loop after handling the first card that was being dragged
+                break
     
     def __handle_mouse_motion(self, pos):
         """Handle mouse motion event.
@@ -237,8 +255,8 @@ class CardDeck:
             for card in self.__cards:
                 if card.dragging:
                     card.update_dragging(pos)
-                    # ส่งการ์ดไปให้ stage ตรวจสอบ
-                    self.stage.handle_card_drag(card, pos)
+                    # Send card to stage for checking
+                    self.stage.handle_card_drag(card, pos, (0, 0))
             
             # Update hover state for all cards
             for card in self.__cards:
@@ -247,46 +265,40 @@ class CardDeck:
                     card.set_hovering(hovering)
     
     def __check_card_placement(self, card: Card, current_position):
-        """ตรวจสอบการวางการ์ด"""
-        print(f"\n[Card Placement Check] Card: {card.card_type} - {card.card_name}")
-        print(f"[Card Placement Check] Position: {current_position}")
-        print(f"[Card Placement Check] Stage exists: {self.stage is not None}")
-        print(f"[Card Placement Check] Hovering area: {card.hovering_area}")
+        """Check card placement on the table
         
-        # ถ้าไม่มี stage หรือการ์ดไม่ได้อยู่เหนือช่องใดๆ
-        if not self.stage:
-            print("[Card Placement Check] No stage found, returning card to deck")
-            card.position = card.original_position
-            card.current_area = "deck"
-            return
-
-        # พยายามวางการ์ด
-        if self.stage.place_card(card, current_position):
-            print("[Card Placement Check] Card placed successfully")
+        Args:
+            card (Card): The card to be placed
+            current_position (tuple): Current position of the card
             
-            # อัปเดต current_area ตาม hovering_area
-            if card.hovering_area:
-                card.current_area = card.hovering_area
-                
-                # ลบการ์ดเก่าจาก placed_cards (ถ้ามี)
-                old_card = self.__placed_cards[card.hovering_area]
-                if old_card is not None and old_card != card:
-                    print(f"[Card Placement Check] Removing old card: {old_card.card_name} from {card.hovering_area}")
-                
-                # อัปเดตการ์ดใหม่ใน placed_cards
-                self.__placed_cards[card.hovering_area] = card
-                print(f"[Card Placement Check] Updated __placed_cards: {card.hovering_area} = {card.card_name}")
-            else:
-                print(f"[Card Placement Check] No hovering area found, using slot position")
-                # หาพื้นที่จาก current_area ที่อัปเดตโดย place_card
-                if card.current_area in self.__placed_cards:
-                    self.__placed_cards[card.current_area] = card
-                    print(f"[Card Placement Check] Updated __placed_cards: {card.current_area} = {card.card_name}")
-        else:
-            print("[Card Placement Check] Card placement failed, returning to deck")
-            # คืนการ์ดกลับไปที่ deck
-            card.position = card.original_position
-            card.current_area = "deck"
+        Returns:
+            bool: True if card placement is successful, False if it cannot be placed
+        """
+        print(f"[CardDeck] Checking placement for card: {card.card_name}")
+        
+        # If card is being placed in an area
+        if card.hovering_area:
+            area = card.hovering_area
+            
+            # Check if there is already a card in this position
+            old_card = self.__placed_cards.get(area)
+            if old_card and old_card != card:
+                print(f"[CardDeck] Replacing old card: {old_card.card_name} with new card: {card.card_name}")
+                # Change card's area to deck
+                old_card.current_area = "deck"
+                # Return old position to old card
+                old_card.position = old_card.original_position
+                old_card.rect.center = old_card.position
+            
+            # Place new card
+            if self.stage.place_card(card, current_position, (0, 0)):
+                print(f"[CardDeck] Successfully placed card: {card.card_name} in area: {area}")
+                # Update placed_cards dictionary
+                self.__placed_cards[area] = card
+                return True
+        
+        print("[CardDeck] Failed to place card")
+        return False
     
     def update(self):
         """Update card states."""
@@ -294,44 +306,118 @@ class CardDeck:
         for card in self.__cards:
             card.update()
             
-        # อัปเดตตำแหน่งการ์ดที่กำลังลาก
+        # Update dragging card positions
         mouse_pos = pygame.mouse.get_pos()
         for card in self.__cards:
             if card.dragging:
                 card.update_dragging(mouse_pos)
-                # ส่งการ์ดไปให้ stage ตรวจสอบ
-                self.stage.handle_card_drag(card, mouse_pos)
+                # Send card to stage for checking
+                self.stage.handle_card_drag(card, mouse_pos, (0, 0))
     
-    def draw(self, screen):
-        """Draw the deck and all cards."""
-        # ตรวจสอบว่ามีการลากการ์ดอยู่หรือไม่
-        dragging_any_card = any(card.dragging for card in self.__cards)
+    def draw(self, screen, camera_offset=(0, 0)):
+        """Draw all cards in the deck.
         
-        # วาดการ์ดที่วางแล้ว
-        for area, card in self.__placed_cards.items():
-            if card is not None and not card.dragging:
-                card.draw(screen)
-
-        # วาดการ์ดใน deck เฉพาะเมื่ออยู่ใน preview mode และไม่มีการลากการ์ดใดๆ
-        if self.__preview_mode and not dragging_any_card:
+        Args:
+            screen (pygame.Surface): Screen to draw on
+            camera_offset (tuple): Offset for camera movement (x, y)
+        """
+        # In preview mode (only when in card selection mode)
+        if self.__preview_mode and not self.__in_game_stage:
+            # Get only cards not placed on the table
+            available_cards = []
             for card in self.__cards:
-                if card is not None and not card.dragging and card.in_preview:
-                    card.draw(screen)
+                if card.current_area == "deck" or card.current_area is None:
+                    available_cards.append(card)
+            
+            total_cards = len(available_cards)
+            for i, card in enumerate(available_cards):
+                # Draw card in position calculated from preview by adding camera_offset
+                preview_data = self.__calculate_preview_position(card, i, total_cards)
+                pos = preview_data['pos']
+                # Adjust position according to camera_offset
+                adjusted_pos = (pos[0] + camera_offset[0], pos[1] + camera_offset[1])
+                preview_data['pos'] = adjusted_pos
+                self.__draw_preview(screen, card, self.__show_hitbox, preview_data)
+        else:
+            # Draw cards in normal mode
+            for card in self.__cards:
+                # Draw only cards that are being dragged or changing from preview
+                if card.dragging or card.animation_progress < 1.0:
+                    # If card is changing from preview
+                    if card.animation_progress < 1.0:
+                        # Adjust prev_preview_position with camera_offset
+                        if card.prev_preview_position:
+                            adjusted_prev_pos = (
+                                card.prev_preview_position[0] + camera_offset[0],
+                                card.prev_preview_position[1] + camera_offset[1]
+                            )
+                            self.__draw_transition_from_preview(screen, card, self.__show_hitbox, adjusted_prev_pos)
+                    # If card is being dragged
+                    elif card.dragging:
+                        card.draw(screen, self.__show_hitbox)
+                # If card is on the table and not being dragged
+                elif card.current_area in ["Navigation", "Collision avoidance", "Recovery"] and not card.dragging:
+                    # Check if card is actually in __placed_cards
+                    is_placed = False
+                    for area, placed_card in self.__placed_cards.items():
+                        if card == placed_card:
+                            is_placed = True
+                            break
                     
-        # วาดการ์ดที่กำลังลากอยู่ (แสดงทับการ์ดอื่นๆ)
-        for card in self.__cards:
-            if card is not None and card.dragging:
-                card.draw(screen)
-
-        # แสดงข้อมูล debug ถ้าเปิดใช้งาน
+                    # If card is actually placed on the table
+                    if is_placed:
+                        # Adjust position according to camera_offset
+                        original_pos = card.position
+                        # Calculate correct position: adjust original_pos with camera_offset
+                        adjusted_pos = (original_pos[0] + camera_offset[0], original_pos[1] + camera_offset[1])
+                        card.position = adjusted_pos
+                        card.draw(screen, self.__show_hitbox)
+                        # Return original position
+                        card.position = original_pos
+        
+        # Draw mouse position if in debug mode
         if self.__show_mouse_position:
             self.__draw_mouse_position(screen)
+            
+    def __draw_transition_from_preview(self, surface, card, show_hitbox=False, adjusted_prev_pos=None):
+        """Draw card transitioning from preview mode
+        
+        Args:
+            surface (pygame.Surface): Surface to draw on
+            card (Card): The card to draw
+            show_hitbox (bool): Whether to show the hit box
+            adjusted_prev_pos (tuple): Preview position adjusted with camera_offset
+        """
+        # Use adjusted position if available
+        prev_pos = adjusted_prev_pos if adjusted_prev_pos else card.prev_preview_position
+        
+        if not prev_pos:
+            # If no preview position, draw normally
+            card.draw(surface, show_hitbox)
+            return
+            
+        # Calculate position between middle
+        current_pos = card.position
+        progress = card.animation_progress
+        
+        # Use easing function for smooth movement
+        ease_progress = 1 - (1 - progress) ** 3  # Cubic easing out
+        
+        # Calculate position between middle
+        interpolated_x = prev_pos[0] + (current_pos[0] - prev_pos[0]) * ease_progress
+        interpolated_y = prev_pos[1] + (current_pos[1] - prev_pos[1]) * ease_progress
+        
+        # Draw card in position between middle
+        original_pos = card.position
+        card.position = (interpolated_x, interpolated_y)
+        card.draw(surface, show_hitbox)
+        card.position = original_pos
 
     def __clear_unused_cards(self):
         """Find and clear any cards that might be in invalid states."""
         # Reset all cards not in play areas to deck
         for card in self.__cards:
-            if card.current_area not in ["Navigation", "Collision_avoidance", "Recovery"]:
+            if card.current_area not in ["Navigation", "Collision avoidance", "Recovery"]:
                 card.current_area = "deck"
 
     @property
@@ -353,8 +439,8 @@ class CardDeck:
         # Get current mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
         
-        # ใช้ค่าเดียวกับในเมธอด __calculate_preview_position
-        center_x_value = 800  # ค่าคงที่เดียวกับที่ใช้ในการคำนวณตำแหน่ง
+        # Use constant value from __calculate_preview_position
+        center_x_value = 800  # Constant value used in calculating position
         
         # Create font for text display
         font = pygame.font.SysFont(None, debug_settings['font_size'])
@@ -407,8 +493,8 @@ class CardDeck:
         # Get base settings for preview
         window_width, window_height = Config.get_window_dimensions()
         
-        # ใช้ค่าคงที่เป็นตำแหน่งจริงเลย ไม่คำนวณจากขนาดหน้าจอ
-        center_x = (window_width // 2 )  # ตำแหน่งทางขวา ปรับตามต้องการ
+        # Use constant value as actual position, no calculation from screen size
+        center_x = (window_width // 2 )  # Position on the right, adjust according to need
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)
@@ -419,7 +505,7 @@ class CardDeck:
         # Single card case - center with no rotation
         if total_cards <= 1:
             return {
-                'pos': (center_x, center_y - 50),  # ใช้ center_x ที่ปรับแล้ว
+                'pos': (center_x, center_y - 50),  # Use center_x adjusted
                 'rotation': 0,
                 'scale': card.hover_scale,
                 'hover_offset': 0 if card.hover_scale == 1.0 else -30,
@@ -489,7 +575,7 @@ class CardDeck:
             y += hover_offset_y
             hover_offset = hover_distance
         
-        # ขยับตำแหน่ง x เพิ่ม offset ตรงๆ
+        # Move position x by adding offset directly
         x += 200
         
         return {
@@ -501,16 +587,17 @@ class CardDeck:
             'hover_animation': hover_animation
         }
 
-    def __draw_preview(self, surface, card, show_hitbox=False):
+    def __draw_preview(self, surface, card, show_hitbox=False, preview_data=None):
         """Draw card in preview mode.
         
         Args:
             surface (pygame.Surface): Surface to draw on
             card (Card): The card to draw
             show_hitbox (bool): Whether to show the hit box
+            preview_data (dict): Position data for the card
         """
-        # Get position and rotation of the card in preview mode
-        preview_data = self.__calculate_preview_position(card, card.preview_index, len(self.__cards))
+        if not preview_data:
+            preview_data = self.__calculate_preview_position(card, card.preview_index, len(self.__cards))
         
         # Create rotated card
         rotated_card = pygame.transform.rotozoom(
@@ -569,33 +656,6 @@ class CardDeck:
             # Draw hitbox
             surface.blit(rotated_hitbox, hitbox_rect)
 
-    def __draw_transition_from_preview(self, surface, card, show_hitbox=False):
-        """Draw transition animation from preview to normal dragging.
-        
-        Args:
-            surface (pygame.Surface): Surface to draw on
-            card (Card): The card to draw
-            show_hitbox (bool): Whether to show the hit box
-        """
-        # Interpolate between preview position and current position
-        start_pos = card.prev_preview_position
-        end_pos = card.position
-        
-        current_x = start_pos[0] + (end_pos[0] - start_pos[0]) * card.animation_progress
-        current_y = start_pos[1] + (end_pos[1] - start_pos[1]) * card.animation_progress
-        
-        # Draw shadow
-        shadow_offset = Config.SHADOW_OFFSET
-        shadow_rect = card.shadow.get_rect(center=(
-            current_x + shadow_offset, 
-            current_y + shadow_offset
-        ))
-        surface.blit(card.shadow, shadow_rect)
-        
-        # Draw card
-        card_rect = card.image.get_rect(center=(current_x, current_y))
-        surface.blit(card.image, card_rect)
-
     def is_in_preview_area(self, card, point, total_cards):
         """Check if the given point is within the card's area in preview mode.
         
@@ -644,3 +704,51 @@ class CardDeck:
     def cards(self):
         """Get all cards in the deck."""
         return self.__cards
+
+    # Add method for changing state to game mode
+    def set_game_stage(self, is_in_game_stage):
+        """Set state to game mode (Game Stage)
+        
+        Args:
+            is_in_game_stage (bool): True if in game mode, False if in card selection mode
+        """
+        self.__in_game_stage = is_in_game_stage
+        
+        if is_in_game_stage:
+            # If entering game mode
+            
+            # Close preview mode
+            self.__preview_mode = False
+            self.__deck_visible = False
+            self.__hovered_card_index = -1
+            
+            # Check all cards
+            for card in self.__cards:
+                # Exit preview mode
+                card.exit_preview_mode()
+                
+                # If card is in deck and not placed on the board
+                # Handle to prevent duplicate display
+                if card.current_area == "deck":
+                    # Check if card is placed on the board
+                    card_is_on_board = False
+                    for area, placed_card in self.__placed_cards.items():
+                        if placed_card == card:
+                            card_is_on_board = True
+                            break
+                    
+                    # If card is not on the board, mark it as not to be displayed
+                    if not card_is_on_board:
+                        card.current_area = None
+        else:
+            # If going back to card selection mode
+            # Return all areas of cards that are not placed on the board
+            for card in self.__cards:
+                is_placed = False
+                for area, placed_card in self.__placed_cards.items():
+                    if card == placed_card:
+                        is_placed = True
+                        break
+                
+                if not is_placed and card.current_area != "deck":
+                    card.current_area = "deck"

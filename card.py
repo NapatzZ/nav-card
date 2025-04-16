@@ -8,11 +8,13 @@ from enum import Enum
 from config import Config
 from typing import Optional
 
+
 class CardType(Enum):
     """Enum for card types."""
     NAVIGATION = "Navigation"
-    COLLISION_AVOIDANCE = "Collision_avoidance"
+    COLLISION_AVOIDANCE = "Collision avoidance"
     RECOVERY_BEHAVIOR = "Recovery"
+
 
 class Card:
     """Class representing a card in the game."""
@@ -134,7 +136,7 @@ class Card:
         """
         self.__dragging = False
         
-        # รีเซ็ตตำแหน่งเมื่อต้องการเท่านั้น
+        # Only reset position if needed
         if reset_position:
             self.__position = self.__original_position
             self.__update_position()
@@ -146,14 +148,14 @@ class Card:
             mouse_pos (tuple): Current mouse position (x, y)
         """
         if self.__dragging:
-            # อัพเดทตำแหน่งการ์ด
+            # Update card position
             self.__position = (
                 mouse_pos[0] + self.__drag_offset[0],
                 mouse_pos[1] + self.__drag_offset[1]
             )
             self.__update_position()
             
-            # รีเซ็ตสถานะ hovering
+            # Reset hovering state
             self.__hovering = False
             self.__hovering_area = None
             self.__hovering_over_card = False
@@ -195,7 +197,7 @@ class Card:
         Returns:
             bool: True if point is within the card's area
         """
-        # ตรวจสอบว่าจุดอยู่ในพื้นที่การ์ดหรือไม่
+        # Check if the point is within the card area
         return self.__rect.collidepoint(point)
     
     def is_in_preview_area(self, point, total_cards):
@@ -253,7 +255,7 @@ class Card:
         """
         # Get base settings for preview
         window_width, window_height = Config.get_window_dimensions()
-        center_x = window_width // 2 + 100  # ขยับจุดกลางไปทางขวา 200 พิกเซล
+        center_x = window_width // 2 + 100  # Shifted center to the right by 200 pixels
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)
@@ -358,11 +360,14 @@ class Card:
             # Draw transition animation from preview to normal
             self.__draw_transition_from_preview(surface, show_hitbox)
         else:
+            # Get current position
+            current_pos = self.__position
+            
             # Draw shadow first
             shadow_offset = Config.SHADOW_OFFSET
             shadow_rect = self.__shadow.get_rect(center=(
-                self.__position[0] + shadow_offset, 
-                self.__position[1] + shadow_offset
+                current_pos[0] + shadow_offset, 
+                current_pos[1] + shadow_offset
             ))
             surface.blit(self.__shadow, shadow_rect)
             
@@ -373,25 +378,30 @@ class Card:
                     (int(self.__width * self.__hover_scale), 
                     int(self.__height * self.__hover_scale))
                 )
-                scaled_rect = scaled_image.get_rect(center=self.__position)
+                scaled_rect = scaled_image.get_rect(center=current_pos)
                 surface.blit(scaled_image, scaled_rect)
             else:
-                surface.blit(self.__image, self.__rect)
+                # Use current position instead of self.__rect
+                card_rect = self.__image.get_rect(center=current_pos)
+                surface.blit(self.__image, card_rect)
+                
+            # Update rect to match current position (for correct collision detection)
+            self.__rect.center = current_pos
     
     def __draw_preview(self, surface, show_hitbox=False):
-        """วาดการ์ดในโหมด preview
+        """Draw card in preview mode.
         
         Args:
             surface (pygame.Surface): Surface to draw on
             show_hitbox (bool): Whether to show the hit box
         """
-        # ใช้ข้อมูลจำนวนการ์ดที่ถูกส่งมาจาก CardDeck โดยตรง
+        # Use card count data sent directly from CardDeck
         total_cards = self.__preview_total_cards
         
-        # รับตำแหน่งและการหมุนของการ์ดในโหมด preview
+        # Get position and rotation of card in preview mode
         preview_data = self.__calculate_preview_position(total_cards)
         
-        # สร้างการ์ดที่หมุนแล้ว
+        # Create rotated card
         rotated_card = pygame.transform.rotozoom(
             self.__image, 
             preview_data['rotation'], 
@@ -399,7 +409,7 @@ class Card:
         )
         rotated_rect = rotated_card.get_rect(center=preview_data['pos'])
         
-        # สร้างเงาที่หมุนแล้ว - เงาอยู่ด้านล่างเพื่อให้ขยับตามการยกขึ้น
+        # Create rotated shadow - shadow is below to move with the lifting
         rotated_shadow = pygame.transform.rotozoom(
             self.__shadow, 
             preview_data['rotation'], 
@@ -407,14 +417,14 @@ class Card:
         )
         shadow_offset = Config.SHADOW_OFFSET
         
-        # ปรับตำแหน่งเงาเมื่อมีการยกขึ้น (hover)
-        if preview_data['hover_offset'] != 0:  # เมื่อมีการ hover เท่านั้น
-            # เงาจะยังคงอยู่ในตำแหน่งเดิม แทนที่จะเคลื่อนที่ขึ้นไปกับการ์ด
+        # Adjust shadow position when hovering (lifted)
+        if preview_data['hover_offset'] != 0:  # Only when hovering
+            # Shadow stays in the original position instead of moving up with the card
             lift_angle = math.radians(preview_data['lift_angle'])
             shadow_offset_x = -preview_data['hover_offset'] * math.cos(lift_angle) * 0.3
             shadow_offset_y = -preview_data['hover_offset'] * math.sin(lift_angle) * 0.3
         else:
-            # ถ้าไม่มีการ hover ให้เงาอยู่ห่างจากการ์ดเล็กน้อยตามปกติ
+            # If not hovering, shadow is slightly offset from card as normal
             shadow_offset_x = shadow_offset
             shadow_offset_y = shadow_offset
         
@@ -423,33 +433,33 @@ class Card:
             preview_data['pos'][1] + shadow_offset_y
         ))
         
-        # วาดเงาและการ์ด
+        # Draw shadow and card
         surface.blit(rotated_shadow, shadow_rect)
         surface.blit(rotated_card, rotated_rect)
     
-        # วาด hitbox เฉพาะเมื่อต้องการแสดงและไม่มีผลต่อตำแหน่งการ์ด
+        # Draw hitbox only when requested and doesn't affect card position
         if show_hitbox:
-            # คำนวณขนาด hitbox (ใหญ่กว่าการ์ด 10%)
+            # Calculate hitbox size (10% larger than card)
             hit_width = self.__width * 1.1 * preview_data['scale']
             hit_height = self.__height * 1.1 * preview_data['scale']
             
-            # สร้าง hitbox surface แบบโปร่งใส
+            # Create transparent hitbox surface
             hitbox_surface = pygame.Surface((hit_width, hit_height), pygame.SRCALPHA)
             
-            # สีแดงโปร่งใส แต่ไม่มีผลต่อการยกตัว
+            # Transparent red color, with no effect on lifting
             hitbox_surface.fill((255, 0, 0, 80))
             
-            # หมุน hitbox ตามการ์ด
+            # Rotate hitbox with card
             rotated_hitbox = pygame.transform.rotozoom(
                 hitbox_surface, 
                 preview_data['rotation'], 
                 1.0
             )
             
-            # ใช้ตำแหน่งเดียวกับการ์ดโดยไม่ทำให้ตำแหน่งเปลี่ยน
+            # Use same position as card without changing position
             hitbox_rect = rotated_hitbox.get_rect(center=preview_data['pos'])
             
-            # วาด hitbox
+            # Draw hitbox
             surface.blit(rotated_hitbox, hitbox_rect)
     
     def __draw_transition_from_preview(self, surface, show_hitbox=False):
@@ -579,7 +589,7 @@ class Card:
         self.__original_position = self.__position
         self.__current_area = None
         
-        # เมื่อเริ่มลากการ์ดจากโหมด preview ให้ออกจากโหมด preview
+        # When starting to drag from preview mode, exit preview mode
         self.__in_preview = False
     
     @property
