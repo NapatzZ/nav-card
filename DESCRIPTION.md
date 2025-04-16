@@ -214,7 +214,7 @@ Three graphs will be generated:
 | Final Week | Polish user interface, finalize documentation |
 
 ## 6. Document Version
-Version: 0.5
+Version: 4.0
 
 ## 7. Statistical Data Revision
 
