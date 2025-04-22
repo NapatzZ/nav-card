@@ -26,7 +26,7 @@ class GameManager:
         # Initialize game components
         self.stage = Stage()
         self.card_deck = CardDeck(self.stage)
-        self.game_state = GameState()
+        self.game_state = GameState.get_instance()
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -210,6 +210,10 @@ class GameManager:
             # Reset to robot placement mode
             self.place_robot_mode = True
             
+            # แสดงปุ่มทั้งหมดอีกครั้ง
+            for button in self.stage.buttons:
+                button.set_visible(True)
+            
             # Stop any running algorithm
             if hasattr(self, 'current_algorithm') and self.current_algorithm:
                 self.current_algorithm.stop()
@@ -234,6 +238,10 @@ class GameManager:
             # Set camera target position to move down half the screen (use positive value)
             self.target_camera_y = self.window_height / 1.8
             self.camera_animating = True
+            
+            # ซ่อนปุ่มทั้งหมดในเกม
+            for button in self.stage.buttons:
+                button.set_visible(False)
             
             # Show message to user about using 'o' key to run algorithm
             print("--------------------------------------------")

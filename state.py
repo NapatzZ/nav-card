@@ -4,10 +4,31 @@ State module for managing game states and transitions.
 from config import Config
 
 class GameState:
-    """Class to manage game states and transitions."""
+    """Class to manage game states and transitions using Singleton pattern."""
+    
+    # คลาส variable สำหรับเก็บ instance เดียว
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls):
+        """Get the singleton instance of GameState.
+        
+        Returns:
+            GameState: The singleton instance
+        """
+        if cls._instance is None:
+            cls._instance = GameState()
+        return cls._instance
     
     def __init__(self):
         """Initialize the game state."""
+        # ถ้ามี instance อยู่แล้ว ให้คืนค่า instance เดิม
+        if GameState._instance is not None:
+            return
+        
+        # ตั้งค่า instance แรก
+        GameState._instance = self
+        
         self.current_state = "PLAYING"  # Initial state
         self.states = {
             "PLAYING": self._handle_playing,
