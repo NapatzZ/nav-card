@@ -705,6 +705,15 @@ class CardDeck:
         """Get all cards in the deck."""
         return self.__cards
 
+    @property
+    def game_stage(self):
+        """Get the game stage state.
+        
+        Returns:
+            bool: True if in game mode, False if in card selection mode
+        """
+        return self.__in_game_stage
+
     # Add method for changing state to game mode
     def set_game_stage(self, is_in_game_stage):
         """Set state to game mode (Game Stage)

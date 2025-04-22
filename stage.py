@@ -39,6 +39,15 @@ class Button:
         
         # Button state
         self.is_hovered = False
+        self.is_visible = True  # เพิ่ม property สำหรับการซ่อน/แสดงปุ่ม
+        
+    def set_visible(self, visible: bool):
+        """Set the visibility of the button.
+        
+        Args:
+            visible (bool): Whether the button should be visible
+        """
+        self.is_visible = visible
         
     def draw(self, screen: pygame.Surface):
         """Draw the button on the screen.
@@ -46,6 +55,10 @@ class Button:
         Args:
             screen (pygame.Surface): Surface to draw on
         """
+        # ไม่แสดงปุ่มถ้าถูกซ่อน
+        if not self.is_visible:
+            return
+            
         # Draw shadow if button is hovered
         if self.is_hovered:
             # Draw slightly larger button
@@ -67,6 +80,10 @@ class Button:
         Returns:
             bool: True if mouse is over the button
         """
+        if not self.is_visible:
+            self.is_hovered = False
+            return False
+            
         self.is_hovered = self.rect.collidepoint(mouse_pos)
         return self.is_hovered
     
@@ -79,6 +96,9 @@ class Button:
         Returns:
             bool: True if button is clicked
         """
+        if not self.is_visible:
+            return False
+            
         return self.rect.collidepoint(mouse_pos)
 
 class CardSlot:
@@ -308,7 +328,7 @@ class Stage:
         return surface
     
     def _initialize_buttons(self) -> List[Button]:
-        """Create various buttons for the Stage."""
+        """Initialize buttons with their positions and actions."""
         buttons = []
         
         # Calculate button positions
@@ -363,16 +383,6 @@ class Stage:
             
             # Draw only the slot without cards
             adjusted_slot.draw(screen, dragging_card)
-        
-        # Draw buttons
-        for button in self.buttons:
-            # Calculate button position using camera_offset
-            original_center = button.rect.center
-            new_center = (original_center[0] + camera_offset[0], original_center[1] + camera_offset[1])
-            button.rect.center = new_center
-            button.draw(screen)
-            # Restore original position
-            button.rect.center = original_center
 
     def handle_card_drag(self, card: Card, mouse_pos: tuple[int, int], camera_offset: Tuple[int, int] = (0, 0)):
         """Handle card dragging over the stage.
@@ -423,35 +433,28 @@ class Stage:
         if not hovering_any_slot:
             card.hovering_area = None
 
-    def handle_mouse_motion(self, mouse_pos: Tuple[int, int], camera_offset: Tuple[int, int] = (0, 0)):
+    def handle_mouse_motion(self, mouse_pos: Tuple[int, int]):
         """Handle mouse motion events.
         
         Args:
-            mouse_pos (Tuple[int, int]): Current mouse position (x, y)
-            camera_offset (Tuple[int, int]): Camera offset (x, y)
+            mouse_pos (Tuple[int, int]): Mouse position (x, y)
         """
-        # Adjust mouse position considering camera offset
-        adjusted_mouse_pos = (mouse_pos[0] - camera_offset[0], mouse_pos[1] - camera_offset[1])
-        
-        # Check if mouse is over any button
+        # ปุ่มไม่ขยับตาม camera_offset ดังนั้นไม่ต้องปรับตำแหน่งเมาส์สำหรับการตรวจสอบ hover
         for button in self.buttons:
-            button.check_hover(adjusted_mouse_pos)
+            button.check_hover(mouse_pos)
     
-    def handle_button_click(self, mouse_pos: Tuple[int, int], camera_offset: Tuple[int, int] = (0, 0)) -> Optional[str]:
+    def handle_button_click(self, mouse_pos: Tuple[int, int]) -> Optional[str]:
         """Handle button click events.
         
         Args:
             mouse_pos (Tuple[int, int]): Mouse position when clicked (x, y)
-            camera_offset (Tuple[int, int]): Camera offset (x, y)
             
         Returns:
             Optional[str]: Action name if a button was clicked, None otherwise
         """
-        # Adjust mouse position considering camera offset
-        adjusted_mouse_pos = (mouse_pos[0] - camera_offset[0], mouse_pos[1] - camera_offset[1])
-        
+        # ปุ่มไม่ขยับตาม camera_offset ดังนั้นไม่ต้องปรับตำแหน่งเมาส์
         for button in self.buttons:
-            if button.is_clicked(adjusted_mouse_pos):
+            if button.is_clicked(mouse_pos):
                 print(f"[Stage] Button clicked: {button.action_name}")
                 return button.action_name
         
@@ -507,3 +510,12 @@ class Stage:
             if slot.valid_area_rect.collidepoint(pos):
                 return slot
         return None
+
+    def set_run_button_visible(self, visible: bool):
+        """Set the visibility of the run algorithm button.
+        
+        Args:
+            visible (bool): Whether the button should be visible
+        """
+        # ฟังก์ชันนี้ไม่ทำงานอีกต่อไปเพราะไม่มีปุ่ม run แล้ว
+        pass
