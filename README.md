@@ -20,6 +20,7 @@ For a more detailed project description, check out our [DESCRIPTION.md](DESCRIPT
 - At the start of each stage, players select one card each for navigation, collision avoidance, and recovery behavior.
 - The robot navigates a 2D map filled with static and dynamic obstacles based on the selected algorithms.
 - The stage is completed by reaching the goal while minimizing recovery attempts and finishing within the best possible time.
+- Once the game starts, all UI buttons disappear to provide a cleaner interface, with algorithm execution handled via keyboard controls.
 
 ## Game Objectives
 - Complete stages within a predefined recovery limit.
@@ -30,6 +31,8 @@ For a more detailed project description, check out our [DESCRIPTION.md](DESCRIPT
 2. **Data Analytics Integration**: Detailed statistical tracking of player performance (e.g., movement efficiency, recovery attempts) allows for in-depth analysis and feedback.
 3. **Dynamic Environments**: Levels feature dynamically changing obstacles, making real-time algorithm adjustments critical.
 4. **Interactive Leaderboards**: Players can compare performance metrics globally, encouraging continual optimization of their algorithm strategies.
+5. **Clean UI Design**: During gameplay, all UI buttons are hidden to provide an unobstructed view of the algorithm execution.
+6. **Singleton Pattern Implementation**: Game state management utilizes the Singleton design pattern to ensure consistent state across all game components.
 
 ## Project Architecture
 
@@ -48,6 +51,7 @@ classDiagram
         +draw()
         +reset_game()
         +start_game()
+        +run_algorithm()
     }
     
     class CardDeck {
@@ -109,13 +113,17 @@ classDiagram
         -position: tuple
         -image: Surface
         -action_name: string
+        -is_visible: boolean
         +draw()
         +check_hover()
         +is_clicked()
+        +set_visible()
     }
     
     class GameState {
         -current_state: string
+        -_instance: GameState
+        +get_instance()
         +update()
         +change_state()
     }
@@ -151,6 +159,12 @@ The game includes various algorithm cards that players can choose from:
 ### Recovery Behaviors
 - Various strategies for recovering from stuck situations or collisions
 
+## Design Patterns
+The game implements several design patterns to ensure clean architecture and maintainable code:
+
+1. **Singleton Pattern**: Used for the GameState class to ensure only one instance exists throughout the application, maintaining a consistent game state.
+2. **Observer Pattern**: Used for event handling and user interactions, allowing different components to react to changes in the game state.
+
 ## Statistical Data Tracking
 The game tracks the following features during gameplay:
 1. **Robot Position Tracking**: Records x-y coordinates and the distance traveled over time.
@@ -169,9 +183,12 @@ The game tracks the following features during gameplay:
 - **Left Click**: Select and place cards
 - **Start Button**: Begin the simulation once cards are placed
 - **Reset Button**: Reset the game state to select cards again
+- **'o' Key**: Run the algorithm after the game has started
+- **'r' Key**: Switch to robot placement mode
+- **'g' Key**: Switch to goal placement mode
 
 ## Development
-This project is developed using Python and Pygame. The card interface currently allows for selecting algorithm cards and viewing them in a fan-out display when pressing the spacebar.
+This project is developed using Python and Pygame. The system features a card-based interface for algorithm selection, with a clean UI design that hides UI elements during gameplay for better focus on algorithm execution.
 
 ## Current Version
-This is version 0.5 of the project, representing 50% completion of the planned features.
+This is version 0.75 of the project, representing 75% completion of the planned features. Recent additions include implementing the Singleton pattern for game state management and improving the UI by hiding buttons during gameplay.

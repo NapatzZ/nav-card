@@ -50,6 +50,13 @@ The project is structured into separate components:
   - `background`: Game environment background
 - **Key Methods**: `draw()`, `handle_mouse_motion()`, `place_card()`, `handle_button_click()`
 
+**GameState (Singleton)**:
+- **Role**: Manages the current state of the game using the Singleton pattern
+- **Key Attributes**:
+  - `current_state`: Current state of the game (e.g., "PLAYING", "PAUSED")
+  - `_instance`: Static instance of the class (Singleton pattern)
+- **Key Methods**: `get_instance()`, `update()`, `change_state()`
+
 **UML Diagram**:
 ```mermaid
 classDiagram
@@ -65,6 +72,7 @@ classDiagram
         +draw()
         +reset_game()
         +start_game()
+        +run_algorithm()
     }
     
     class CardDeck {
@@ -126,13 +134,17 @@ classDiagram
         -position: tuple
         -image: Surface
         -action_name: string
+        -is_visible: boolean
         +draw()
         +check_hover()
         +is_clicked()
+        +set_visible()
     }
     
     class GameState {
         -current_state: string
+        -_instance: GameState
+        +get_instance()
         +update()
         +change_state()
     }
@@ -152,7 +164,16 @@ classDiagram
     Card ..> CardType : has type
 ```
 
-### 3.3 Algorithms Involved
+### 3.3 Design Patterns Implemented
+- **Singleton Pattern**: Used for the GameState class to ensure only one instance exists throughout the application. This pattern ensures consistent state management across the entire game.
+- **Observer Pattern**: Used for handling events and user interactions, allowing different components to react to changes in the game state.
+
+### 3.4 Game Flow and Controls
+- **Selection Phase**: Players select algorithm cards and place them in appropriate slots
+- **Gameplay Phase**: Once the Start button is pressed, all UI buttons disappear, and the player can run the algorithm by pressing the 'o' key
+- **Reset**: Returns to the selection phase, restoring all buttons and allowing different card selections
+
+### 3.5 Algorithms Involved
 - **Move Validation**: Checking if a card can be placed in a specific slot based on card type
 - **Card Visualization**: Displaying cards in a fan-out pattern when in preview mode
 - **Camera Animation**: Smooth transition between card selection screen and gameplay area
@@ -202,19 +223,20 @@ Three graphs will be generated:
 
 ## 5. Project Timeline
 
-| Week | Task |
-|------|------|
-| Week 1 (March) | Proposal submission / Project initiation |
-| Week 2 | Design system architecture, create UML diagram |
-| Week 3 | Develop core classes (GameManager, Card, CardDeck) |
-| Week 4 | Implement card selection interface and preview mode |
-| Week 5 | Create stage environment and robot navigation display |
-| Week 6 (by April 16) | Complete card placement system and camera transitions |
-| Weeks 7-8 | Develop data collection framework and visualization |
-| Final Week | Polish user interface, finalize documentation |
+| Week | Task | Status |
+|------|------|--------|
+| Week 1 (March) | Proposal submission / Project initiation | Completed |
+| Week 2 | Design system architecture, create UML diagram | Completed |
+| Week 3 | Develop core classes (GameManager, Card, CardDeck) | Completed |
+| Week 4 | Implement card selection interface and preview mode | Completed |
+| Week 5 | Create stage environment and robot navigation display | Completed |
+| Week 6 (by April 16) | Complete card placement system and camera transitions | Completed |
+| Week 7 | Implement design patterns (Singleton) and improve UI | Completed |
+| Week 8 | Develop data collection framework and visualization | In Progress |
+| Final Week | Polish user interface, finalize documentation | Pending |
 
 ## 6. Document Version
-Version: 1.0
+Version: 1.2
 
 ## 7. Statistical Data Revision
 
@@ -251,24 +273,24 @@ Begin implementing robot navigation visualization based on selected cards; add d
 **April 24 – May 11**:
 Finalize data presentation (tables and graphs for algorithm performance); complete UI polishing; perform comprehensive testing and debugging; prepare final documentation.
 
-### 8.2 50% of Tasks by April 16
-**By April 16 (50% Completion)**:
+### 8.2 Current Progress (75% Completion)
+**Completed Tasks**:
 - Core classes (GameManager, Card, CardDeck, Stage) are operational
 - Card selection, dragging, and placement functionality implemented
 - Preview mode (fan-out display) is working
 - Camera transition between selection and gameplay screens
 - Basic UI elements (buttons, card slots) are functional
-
-**By April 23 (75% Completion)**:
 - Robot navigation visualization based on selected algorithms
-- Initial implementation of data collection framework
-- Stage environment with obstacles and goal position
+- Implementation of Singleton pattern for GameState
+- Improved UI with dynamic button visibility during gameplay
+- Keyboard controls for algorithm execution ('o' key)
 
-**By May 11 (Final 25% Completion)**:
-- Complete data visualization components
-- Finalize robot navigation simulation
-- Comprehensive testing, debugging, and documentation
-- Final project submission with all deliverables
+**Remaining Tasks**:
+- Complete data collection framework
+- Implement performance visualization
+- Add additional algorithm cards
+- Final testing and debugging
+- Complete documentation
 
 ## GitHub Repository
 https://github.com/NapatzZ/nav-card 
