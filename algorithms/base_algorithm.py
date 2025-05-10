@@ -21,7 +21,7 @@ class BaseAlgorithm:
         self.current_path_index = 0
         self.is_running = False
         self.is_completed = False
-        self.step_delay = 0.3  # เวลาหน่วง (วินาที) ระหว่างแต่ละสเต็ป
+        self.step_delay = 0.2  # เวลาหน่วง (วินาที) ระหว่างแต่ละสเต็ป
         self.last_step_time = 0  # เวลาของสเต็ปล่าสุด
         
     def start(self):

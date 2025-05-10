@@ -511,11 +511,4 @@ class Stage:
                 return slot
         return None
 
-    def set_run_button_visible(self, visible: bool):
-        """Set the visibility of the run algorithm button.
-        
-        Args:
-            visible (bool): Whether the button should be visible
-        """
-        # ฟังก์ชันนี้ไม่ทำงานอีกต่อไปเพราะไม่มีปุ่ม run แล้ว
-        pass
+

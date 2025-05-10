@@ -4,6 +4,7 @@ GameManager module for managing the main game loop and states.
 import pygame
 import os
 import random
+import time
 from config import Config
 from cardDeck import CardDeck 
 from card import Card
@@ -13,7 +14,7 @@ from costmap import Costmap
 
 class GameManager:
     """Class to manage the main game loop and states."""
-    
+
     def __init__(self):
         """Initialize the game manager."""
         pygame.init()
@@ -50,6 +51,11 @@ class GameManager:
         self.target_camera_y = 0
         self.camera_speed = 0.05  # Speed of camera movement (0-1, 1 = instant)
         self.camera_animating = False
+        
+        # Timer for auto-starting algorithm
+        self.algorithm_start_time = 0
+        self.should_auto_start = False
+        self.auto_start_delay = 2 
     
     def handle_events(self):
         """Handle all game events."""
@@ -67,16 +73,8 @@ class GameManager:
             # Handle key press for switching between placing robot/goal
             elif event.type == pygame.KEYDOWN:
                 try:
-                    if event.key == pygame.K_r:  # Press 'r' to switch to robot placement
-                        self.place_robot_mode = True
-                        print("Now placing: Robot (blue)")
-                    elif event.key == pygame.K_g:  # Press 'g' to switch to goal placement
-                        self.place_robot_mode = False
-                        print("Now placing: Goal (red)")
-                    elif event.key == pygame.K_o:  # Press 'o' to run algorithm
-                        if self.game_state.current_state == "PLAYING" and self.card_deck.game_stage:
-                            print("Running algorithm with 'o' key")
-                            self.run_algorithm()
+                    if event.key == pygame.K_spacebar and self.game_state.current_state == "PLAYING":
+                        self.reset_game()
                 except Exception as e:
                     print(f"Error handling key press: {e}")
             
@@ -200,9 +198,6 @@ class GameManager:
             # Set state to card selection mode (not gameplay mode)
             self.card_deck.set_game_stage(False)
             
-            # Reset costmap to initial state
-            self.costmap.reset_demo_map()
-            
             # Reset camera to initial position
             self.target_camera_y = 0
             self.camera_animating = True
@@ -232,9 +227,6 @@ class GameManager:
             # Set state to gameplay mode
             self.card_deck.set_game_stage(True)
             
-            # Reset costmap for new game
-            self.costmap.reset_demo_map()
-            
             # Set camera target position to move down half the screen (use positive value)
             self.target_camera_y = self.window_height / 1.8
             self.camera_animating = True
@@ -243,9 +235,13 @@ class GameManager:
             for button in self.stage.buttons:
                 button.set_visible(False)
             
-            # Show message to user about using 'o' key to run algorithm
+            # Set timer for auto-starting algorithm after delay
+            self.algorithm_start_time = time.time()
+            self.should_auto_start = True
+            
+            # Show message to user about auto-starting
             print("--------------------------------------------")
-            print("พร้อมเริ่มการทำงาน: กดปุ่ม 'o' เพื่อเริ่มอัลกอริทึม")
+            print(f"เกมจะเริ่มทำงานอัตโนมัติใน {self.auto_start_delay} วินาที")
             print("--------------------------------------------")
         except Exception as e:
             print(f"Error starting game: {e}")
@@ -330,6 +326,11 @@ class GameManager:
                     self.camera_y = self.target_camera_y
                     self.camera_animating = False
             
+            # Check if algorithm should auto-start
+            if self.should_auto_start and time.time() - self.algorithm_start_time >= self.auto_start_delay:
+                self.should_auto_start = False
+                self.run_algorithm()
+            
             # Update game state
             self.game_state.update()
             
@@ -410,3 +411,11 @@ class GameManager:
                 # Continue without crashing
         
         pygame.quit() 
+        
+        
+"""
+
+game_state
+card_deck.set_game_stage 
+
+"""

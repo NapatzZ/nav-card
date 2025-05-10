@@ -97,6 +97,7 @@ classDiagram
         +place_card()
         +handle_button_click()
         +get_slot_at_position()
+        +set_run_button_visible()
     }
     
     class CardSlot {
@@ -122,15 +123,18 @@ classDiagram
     
     class GameState {
         -current_state: string
-        -_instance: GameState
-        +get_instance()
+        -_instance: GameState$
+        +get_instance()$
         +update()
         +change_state()
+        -_handle_playing()
+        -_handle_paused()
+        -_handle_game_over()
     }
     
     GameManager --> Stage : manages
     GameManager --> CardDeck : contains
-    GameManager --> GameState : tracks
+    GameManager --> GameState : uses
     
     Stage --> CardSlot : contains
     Stage --> Button : contains
@@ -141,6 +145,8 @@ classDiagram
     CardSlot --> CardType : accepts type
     
     Card ..> CardType : has type
+    
+    note for GameState "Singleton Pattern"
 ```
 
 ## Algorithm Cards
