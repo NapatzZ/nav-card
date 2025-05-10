@@ -137,7 +137,7 @@ class Config:
     def get_card_names():
         """Get valid card names for each type."""
         return {
-            "Navigation": ["AStar", "WallFollowing", "RRT", "GreedySearch", "Dijkstra", "DWA"],
+            "Navigation": ["AStar", "RRT", "BFS", "DFS", "Dijkstra"],
             "Collision avoidance": [ "Bug", "VFH"],
             "Recovery": ["SpinInPlace", "StepBack"]
         }

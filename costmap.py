@@ -9,12 +9,12 @@ from config import Config
 class Costmap:
     """Class to manage occupancy grid maps for navigation visualization."""
     
-    def __init__(self, rect_width=907, rect_height=455, resolution=20, pgm_path=None):
+    def __init__(self, rect_width=900, rect_height=460, resolution=20, pgm_path=None):
         """Initialize the costmap.
         
         Args:
-            rect_width (int): Width of the grid area in pixels
-            rect_height (int): Height of the grid area in pixels
+            rect_width (int): Width of the grid area in pixels (should be 45 * resolution)
+            rect_height (int): Height of the grid area in pixels (should be 23 * resolution)
             resolution (int): Size of each grid cell in pixels
             pgm_path (str, optional): Path to a PGM file to load as map
         """
@@ -24,8 +24,8 @@ class Costmap:
         
         # Calculate grid dimensions to fill the entire rectangle exactly
         # Calculate the resolution that fits perfectly into the rectangle
-        self.grid_width = rect_width // resolution
-        self.grid_height = rect_height // resolution
+        self.grid_width = 45  # Fixed width of 45 cells
+        self.grid_height = 23  # Fixed height of 23 cells
         
         # Adjust the resolution slightly to fit exactly
         self.actual_resolution_x = rect_width / self.grid_width

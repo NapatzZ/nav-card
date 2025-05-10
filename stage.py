@@ -7,10 +7,21 @@ from card import Card, CardType
 from config import Config
 
 class Button:
-    """Class representing a clickable button in the game."""
+    """
+    Class representing a clickable button in the game.
+    
+    Attributes:
+        position (Tuple[int, int]): Position of the button
+        action_name (str): Name of the action when clicked
+        image (pygame.Surface): Button image
+        rect (pygame.Rect): Rectangle for click detection
+        is_hovered (bool): Whether mouse is hovering over button
+        is_visible (bool): Whether button is visible
+    """
     
     def __init__(self, position: Tuple[int, int], image_path: str, action_name: str):
-        """Initialize a button with an image.
+        """
+        Initialize a button with an image.
         
         Args:
             position (Tuple[int, int]): Position of the button
@@ -20,13 +31,10 @@ class Button:
         self.position = position
         self.action_name = action_name
         
-        # Load the image
         try:
             self.image = pygame.image.load(image_path)
-            # Resize image if needed
             self.image = pygame.transform.scale(self.image, (250, 150))
         except pygame.error:
-            # Create an empty surface if image loading fails
             self.image = pygame.Surface((100, 50))
             self.image.fill((150, 150, 150))
             font = pygame.font.Font(None, 24)
@@ -34,15 +42,13 @@ class Button:
             text_rect = text.get_rect(center=(50, 25))
             self.image.blit(text, text_rect)
         
-        # Create rect for click detection
         self.rect = self.image.get_rect(center=position)
-        
-        # Button state
         self.is_hovered = False
-        self.is_visible = True  # เพิ่ม property สำหรับการซ่อน/แสดงปุ่ม
+        self.is_visible = True
         
     def set_visible(self, visible: bool):
-        """Set the visibility of the button.
+        """
+        Set the visibility of the button.
         
         Args:
             visible (bool): Whether the button should be visible
@@ -50,29 +56,27 @@ class Button:
         self.is_visible = visible
         
     def draw(self, screen: pygame.Surface):
-        """Draw the button on the screen.
+        """
+        Draw the button on the screen.
         
         Args:
             screen (pygame.Surface): Surface to draw on
         """
-        # ไม่แสดงปุ่มถ้าถูกซ่อน
         if not self.is_visible:
             return
             
-        # Draw shadow if button is hovered
         if self.is_hovered:
-            # Draw slightly larger button
             scaled_image = pygame.transform.scale(self.image, 
                                                  (int(self.rect.width * 1.25), 
                                                   int(self.rect.height * 1.25)))
             scaled_rect = scaled_image.get_rect(center=self.rect.center)
             screen.blit(scaled_image, scaled_rect)
         else:
-            # Draw normal button
             screen.blit(self.image, self.rect)
     
     def check_hover(self, mouse_pos: Tuple[int, int]) -> bool:
-        """Check if mouse is over the button.
+        """
+        Check if mouse is over the button.
         
         Args:
             mouse_pos (Tuple[int, int]): Current mouse position
@@ -88,7 +92,8 @@ class Button:
         return self.is_hovered
     
     def is_clicked(self, mouse_pos: Tuple[int, int]) -> bool:
-        """Check if button is clicked.
+        """
+        Check if button is clicked.
         
         Args:
             mouse_pos (Tuple[int, int]): Current mouse position
@@ -102,10 +107,23 @@ class Button:
         return self.rect.collidepoint(mouse_pos)
 
 class CardSlot:
-    """Class representing a slot where cards can be placed."""
+    """
+    Class representing a slot where cards can be placed.
+    
+    Attributes:
+        position (tuple): Position of the slot (x, y)
+        card_type (CardType): Type of card that can be placed in this slot
+        card (Optional[Card]): Card currently in the slot
+        is_highlighted (bool): Whether the slot is highlighted
+        highlight_color (tuple): Color for highlighting
+        slot_surface (pygame.Surface): Surface for the slot
+        valid_area_rect (pygame.Rect): Rectangle for valid card placement area
+        rect (pygame.Rect): Rectangle for the slot
+    """
     
     def __init__(self, position: tuple[int, int], card_type: CardType):
-        """Initialize a card slot.
+        """
+        Initialize a card slot.
         
         Args:
             position (tuple): Position of the slot (x, y)
@@ -117,13 +135,8 @@ class CardSlot:
         self.is_highlighted = False
         self.highlight_color = (255, 255, 255)
         
-        # Create surface for card slot
         self.slot_surface = self._create_slot_surface()
-        
-        # Create valid area rect
         self.valid_area_rect = self._create_valid_area_rect()
-        
-        # Create rect for card slot
         self.rect = pygame.Rect(
             position[0],
             position[1],
@@ -132,7 +145,8 @@ class CardSlot:
         )
 
     def _create_valid_area_rect(self) -> pygame.Rect:
-        """Create valid area rect for the card.
+        """
+        Create valid area rect for the card.
         
         Returns:
             pygame.Rect: Rectangle representing the valid area
@@ -145,17 +159,16 @@ class CardSlot:
         )
 
     def _create_slot_surface(self) -> pygame.Surface:
-        """Create surface for card slot.
+        """
+        Create surface for card slot.
         
         Returns:
             pygame.Surface: Surface for the card slot
         """
         surface = pygame.Surface((Config.CARD_SLOT_WIDTH, Config.CARD_SLOT_HEIGHT), pygame.SRCALPHA)
         
-        # Draw slot background
         pygame.draw.rect(surface, Config.CARD_SLOT_COLOR, (0, 0, Config.CARD_SLOT_WIDTH, Config.CARD_SLOT_HEIGHT), border_radius=10)
         
-        # Draw card type name
         font = pygame.font.SysFont("Arial", 24)
         text = font.render(self.card_type.value, True, (255, 255, 255))
         text_rect = text.get_rect(centerx=Config.CARD_SLOT_WIDTH//2, y=10)
@@ -164,55 +177,48 @@ class CardSlot:
         return surface
 
     def draw(self, screen: pygame.Surface, dragging_card: Optional[Card] = None):
-        """Draw card slot and valid area.
+        """
+        Draw card slot and valid area.
         
         Args:
             screen (pygame.Surface): Surface to draw on
             dragging_card (Optional[Card]): Card being dragged
         """
-        # Draw slot background
         screen.blit(self.slot_surface, self.position)
         
-        # Draw border
         border_color = self.highlight_color if self.is_highlighted else (255, 255, 255)
         pygame.draw.rect(screen, border_color,
                         (*self.position, Config.CARD_SLOT_WIDTH, Config.CARD_SLOT_HEIGHT),
                         2, border_radius=10)
         
-        # Draw valid area if a card is being dragged
         if dragging_card:
-            # Create surface for valid area
             valid_surface = pygame.Surface((Config.CARD_SLOT_WIDTH, Config.CARD_SLOT_HEIGHT), pygame.SRCALPHA)
             
-            # Check if card can be placed
             can_place = self.can_accept_card(dragging_card)
             
-            # Set background color based on conditions
             if self.card is not None:
                 if dragging_card.hovering_area == self.card_type.value and dragging_card.hovering_over_card:
-                    valid_surface.fill((100, 100, 100, Config.VALID_AREA_ALPHA))  # Dark gray when replacing card
+                    valid_surface.fill((100, 100, 100, Config.VALID_AREA_ALPHA))
                 else:
-                    valid_surface.fill((0, 0, 0, 0))  # Transparent
+                    valid_surface.fill((0, 0, 0, 0))
             elif dragging_card.hovering_area == self.card_type.value:
                 if can_place:
-                    valid_surface.fill((120, 120, 120, Config.VALID_AREA_ALPHA))  # Gray when can place
+                    valid_surface.fill((120, 120, 120, Config.VALID_AREA_ALPHA))
                 else:
-                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))  # Red when cannot place
+                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))
             elif self.card_type.value == dragging_card.card_type:
                 if can_place:
-                    valid_surface.fill((150, 150, 150, Config.VALID_AREA_ALPHA))  # Light gray when can place
+                    valid_surface.fill((150, 150, 150, Config.VALID_AREA_ALPHA))
                 else:
-                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))  # Red when cannot place
+                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))
             else:
                 if can_place:
-                    valid_surface.fill((80, 130, 100, Config.VALID_AREA_ALPHA))  # Light green when can place
+                    valid_surface.fill((80, 130, 100, Config.VALID_AREA_ALPHA))
                 else:
-                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))  # Red when cannot place
+                    valid_surface.fill((200, 100, 100, Config.VALID_AREA_ALPHA))
             
-            # Draw valid area on screen
             screen.blit(valid_surface, self.position)
             
-            # Draw card type text above
             font = pygame.font.SysFont(None, 32)
             label_text = self.card_type.value
             label_surface = font.render(label_text, True, Config.WHITE_COLOR)
@@ -222,7 +228,6 @@ class CardSlot:
             )
             screen.blit(label_surface, label_rect)
             
-            # Draw card type text below
             type_surface = font.render(self.card_type.value, True, Config.WHITE_COLOR)
             type_rect = type_surface.get_rect(
                 centerx=self.position[0] + Config.CARD_SLOT_WIDTH // 2,
@@ -230,22 +235,13 @@ class CardSlot:
             )
             screen.blit(type_surface, type_rect)
         
-        # Draw card if exists but not being dragged
         if self.card and not self.card.dragging:
-            # Card center position, calculated from slot position
             card_center_x = self.position[0] + Config.CARD_SLOT_WIDTH // 2
             card_center_y = self.position[1] + Config.CARD_SLOT_HEIGHT // 2
             
-            # Save original card position
             original_pos = self.card.position
-            
-            # Set card position to center of slot
             self.card.position = (card_center_x, card_center_y)
-            
-            # Draw card
             self.card.draw(screen)
-            
-            # Restore original position
             self.card.position = original_pos
 
     def can_accept_card(self, card: Card) -> bool:
@@ -439,7 +435,7 @@ class Stage:
         Args:
             mouse_pos (Tuple[int, int]): Mouse position (x, y)
         """
-        # ปุ่มไม่ขยับตาม camera_offset ดังนั้นไม่ต้องปรับตำแหน่งเมาส์สำหรับการตรวจสอบ hover
+        # Buttons don't move with camera_offset, so no need to adjust mouse position for hover check
         for button in self.buttons:
             button.check_hover(mouse_pos)
     
@@ -452,7 +448,7 @@ class Stage:
         Returns:
             Optional[str]: Action name if a button was clicked, None otherwise
         """
-        # ปุ่มไม่ขยับตาม camera_offset ดังนั้นไม่ต้องปรับตำแหน่งเมาส์
+        # Buttons don't move with camera_offset, so no need to adjust mouse position
         for button in self.buttons:
             if button.is_clicked(mouse_pos):
                 print(f"[Stage] Button clicked: {button.action_name}")

@@ -13,10 +13,29 @@ from stage import Stage
 from costmap import Costmap
 
 class GameManager:
-    """Class to manage the main game loop and states."""
+    """
+    Main game manager class that handles the game loop, states, and interactions.
+    
+    This class is responsible for:
+    - Managing the game window and display
+    - Handling user input and events
+    - Coordinating between different game components
+    - Managing game states and transitions
+    - Controlling the camera and view
+    - Running algorithms and simulations
+    """
 
     def __init__(self):
-        """Initialize the game manager."""
+        """
+        Initialize the game manager with all necessary components and settings.
+        
+        Sets up:
+        - Pygame window and display
+        - Game components (Stage, CardDeck, GameState)
+        - Costmap for navigation
+        - Camera and view settings
+        - Auto-start timer settings
+        """
         pygame.init()
         
         # Set up the display
@@ -27,7 +46,7 @@ class GameManager:
         # Initialize game components
         self.stage = Stage()
         self.card_deck = CardDeck(self.stage)
-        self.game_state = GameState.get_instance()
+        self.game_state = GameState()  # Use new singleton pattern
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -37,8 +56,8 @@ class GameManager:
         # Initialize costmap with appropriate resolution
         # Using 20 pixels per grid cell gives a good balance between detail and performance
         self.costmap = Costmap(
-            rect_width=907, 
-            rect_height=455, 
+            rect_width=900,  # 45 * 20
+            rect_height=460,  # 23 * 20
             resolution=20, 
             pgm_path=pgm_file_path if os.path.exists(pgm_file_path) else None
         )
@@ -58,7 +77,14 @@ class GameManager:
         self.auto_start_delay = 2 
     
     def handle_events(self):
-        """Handle all game events."""
+        """
+        Handle all game events including:
+        - Window events (quit)
+        - Mouse movement and clicks
+        - Keyboard input
+        - Button interactions
+        - Card interactions
+        """
         events = pygame.event.get()
         
         for event in events:
@@ -73,7 +99,7 @@ class GameManager:
             # Handle key press for switching between placing robot/goal
             elif event.type == pygame.KEYDOWN:
                 try:
-                    if event.key == pygame.K_spacebar and self.game_state.current_state == "PLAYING":
+                    if event.key == pygame.K_SPACE and self.game_state.current_state == "PLAYING":
                         self.reset_game()
                 except Exception as e:
                     print(f"Error handling key press: {e}")
@@ -141,10 +167,11 @@ class GameManager:
             # Continue without crashing
     
     def handle_button_action(self, action: str):
-        """Handle button action based on action name.
+        """
+        Handle button actions based on the action name.
         
         Args:
-            action (str): Action name
+            action (str): The name of the action to perform
         """
         try:
             if action == "reset":
@@ -164,7 +191,11 @@ class GameManager:
             # Continue without crashing
     
     def load_map(self):
-        """Load a map from a PGM file."""
+        """
+        Load a map from a PGM file.
+        
+        Attempts to load the map from the default path in the data directory.
+        """
         try:
             # Default path for map file
             pgm_file_path = os.path.join("data", "map.pgm")
@@ -181,7 +212,17 @@ class GameManager:
             # Continue without crashing
     
     def reset_game(self):
-        """Reset the game to initial state by moving all cards from stage back to deck."""
+        """
+        Reset the game to its initial state.
+        
+        This includes:
+        - Removing cards from slots
+        - Resetting the card deck
+        - Changing game state
+        - Resetting camera position
+        - Showing all buttons
+        - Stopping any running algorithm
+        """
         try:
             print("[GameManager] Resetting game...")
             
@@ -205,7 +246,7 @@ class GameManager:
             # Reset to robot placement mode
             self.place_robot_mode = True
             
-            # แสดงปุ่มทั้งหมดอีกครั้ง
+            # Show all buttons again
             for button in self.stage.buttons:
                 button.set_visible(True)
             
@@ -218,7 +259,16 @@ class GameManager:
             # Continue without crashing
     
     def start_game(self):
-        """Start the game."""
+        """
+        Start the game and prepare for algorithm execution.
+        
+        This includes:
+        - Changing game state
+        - Setting up gameplay mode
+        - Adjusting camera position
+        - Hiding UI buttons
+        - Setting up auto-start timer
+        """
         try:
             print("[GameManager] Starting game...")
             # Change game state to PLAYING
@@ -231,7 +281,7 @@ class GameManager:
             self.target_camera_y = self.window_height / 1.8
             self.camera_animating = True
             
-            # ซ่อนปุ่มทั้งหมดในเกม
+            # Hide all game buttons
             for button in self.stage.buttons:
                 button.set_visible(False)
             
@@ -241,7 +291,7 @@ class GameManager:
             
             # Show message to user about auto-starting
             print("--------------------------------------------")
-            print(f"เกมจะเริ่มทำงานอัตโนมัติใน {self.auto_start_delay} วินาที")
+            print(f"Game will start automatically in {self.auto_start_delay} seconds")
             print("--------------------------------------------")
         except Exception as e:
             print(f"Error starting game: {e}")
@@ -254,7 +304,7 @@ class GameManager:
             
             # Check if robot and goal are set
             if not self.costmap.robot_pos or not self.costmap.goal_pos:
-                print("ไม่สามารถเริ่มอัลกอริทึมได้: ต้องกำหนดตำแหน่งหุ่นยนต์และเป้าหมายก่อน")
+                print("Cannot start algorithm: Robot and goal positions must be set first")
                 return
             
             # Get all cards in slots
@@ -264,12 +314,12 @@ class GameManager:
                     algorithm_cards.append(slot.card)
             
             if not algorithm_cards:
-                print("ไม่สามารถเริ่มอัลกอริทึมได้: ต้องเลือกการ์ดอัลกอริทึมก่อน")
+                print("Cannot start algorithm: Algorithm cards must be selected first")
                 return
             
             # For testing, use the first card
             selected_card = algorithm_cards[0]
-            print(f"ใช้อัลกอริทึม: {selected_card.card_name} ({selected_card.card_type})")
+            print(f"Using algorithm: {selected_card.card_name} ({selected_card.card_type})")
             
             # Get algorithm class based on card type and name
             algorithm_class = None
@@ -278,7 +328,6 @@ class GameManager:
             from algorithms.navigation import NAVIGATION_ALGORITHMS
             from algorithms.collision_avoidance import COLLISION_AVOIDANCE_ALGORITHMS
             from algorithms.recovery import RECOVERY_ALGORITHMS
-            from algorithms.path_planning import PATH_PLANNING_ALGORITHMS
             
             # Look up algorithm class based on card type and name
             if selected_card.card_type == "Navigation":
@@ -288,12 +337,8 @@ class GameManager:
             elif selected_card.card_type == "Recovery":
                 algorithm_class = RECOVERY_ALGORITHMS.get(selected_card.card_name)
             
-            # Also check path planning algorithms
             if not algorithm_class:
-                algorithm_class = PATH_PLANNING_ALGORITHMS.get(selected_card.card_name)
-            
-            if not algorithm_class:
-                print(f"ไม่พบอัลกอริทึมสำหรับการ์ด: {selected_card.card_name}")
+                print(f"Algorithm not found for card: {selected_card.card_name}")
                 return
             
             # Create algorithm instance
@@ -302,15 +347,15 @@ class GameManager:
             # Start algorithm
             success = self.current_algorithm.start()
             if not success:
-                print("ไม่สามารถเริ่มอัลกอริทึมได้")
+                print("Failed to start algorithm")
                 self.current_algorithm = None
                 return
             
             print("--------------------------------------------")
-            print(f"อัลกอริทึม {selected_card.card_name} กำลังทำงาน โปรดรอสักครู่...")
+            print(f"Algorithm {selected_card.card_name} is running, please wait...")
             print("--------------------------------------------")
         except Exception as e:
-            print(f"เกิดข้อผิดพลาดในการเริ่มอัลกอริทึม: {e}")
+            print(f"Error starting algorithm: {e}")
             self.current_algorithm = None
             # Continue without crashing
     

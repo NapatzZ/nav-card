@@ -1,67 +1,44 @@
 """
-State module for managing game states and transitions.
+Game state management module.
 """
-from config import Config
+from enum import Enum
 
 class GameState:
-    """Class to manage game states and transitions using Singleton pattern."""
+    """
+    Singleton class for managing game state.
     
-    # คลาส variable สำหรับเก็บ instance เดียว
+    This class ensures only one instance exists throughout the game,
+    providing centralized state management.
+    """
+    
     _instance = None
     
-    @classmethod
-    def get_instance(cls):
-        """Get the singleton instance of GameState.
-        
-        Returns:
-            GameState: The singleton instance
-        """
+    def __new__(cls):
         if cls._instance is None:
-            cls._instance = GameState()
+            # Create new instance if none exists
+            cls._instance = super(GameState, cls).__new__(cls)
+            # Initialize first instance
+            cls._instance.current_state = "PLAYING"
         return cls._instance
     
-    def __init__(self):
-        """Initialize the game state."""
-        # ถ้ามี instance อยู่แล้ว ให้คืนค่า instance เดิม
-        if GameState._instance is not None:
-            return
-        
-        # ตั้งค่า instance แรก
-        GameState._instance = self
-        
-        self.current_state = "PLAYING"  # Initial state
-        self.states = {
-            "PLAYING": self._handle_playing,
-            "PAUSED": self._handle_paused,
-            "GAME_OVER": self._handle_game_over
-        }
-    
-    def update(self):
-        """Update the current game state."""
-        handler = self.states.get(self.current_state)
-        if handler:
-            handler()
-    
-    def change_state(self, new_state):
-        """Change the current game state.
+    def change_state(self, new_state: str):
+        """
+        Change the current game state.
         
         Args:
-            new_state (str): The new state to transition to
+            new_state (str): New state to set
         """
-        if new_state in self.states:
-            self.current_state = new_state
+        self.current_state = new_state
     
-    def _handle_playing(self):
-        """Handle the playing state."""
-        # Add game logic for playing state
-        pass
+    def get_state(self) -> str:
+        """
+        Get the current game state.
+        
+        Returns:
+            str: Current game state
+        """
+        return self.current_state
     
-    def _handle_paused(self):
-        """Handle the paused state."""
-        # Add game logic for paused state
-        pass
-    
-    def _handle_game_over(self):
-        """Handle the game over state."""
-        # Add game logic for game over state
+    def update(self):
+        """Update game state logic."""
         pass

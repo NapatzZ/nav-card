@@ -73,11 +73,11 @@ class CardDeck:
         cards_to_add = [
             # Navigation cards
             ("Navigation", "AStar"),
-            ("Navigation", "WallFollowing"),
             ("Navigation", "RRT"),
             ("Navigation", "Dijkstra"),
-            ("Navigation", "GreedySearch"),
-            ("Navigation", "DWA")
+            ("Navigation", "BFS"),
+            ("Navigation", "DFS"),
+
             
             # Collision avoidance cards
            #  ("Collision avoidance", "Potential_Field"),
