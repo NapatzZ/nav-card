@@ -569,7 +569,7 @@ class CardDeck:
         window_width, window_height = Config.get_window_dimensions()
         
         # Use constant value as actual position, no calculation from screen size
-        center_x = (window_width // 2 )  # Position on the right, adjust according to need
+        center_x = window_width // 2  # ตำแหน่งตรงกลางจอ
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)
@@ -649,9 +649,6 @@ class CardDeck:
             x += hover_offset_x
             y += hover_offset_y
             hover_offset = hover_distance
-        
-        # Move position x by adding offset directly
-        x += 200
         
         return {
             'pos': (x, y),

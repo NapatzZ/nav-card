@@ -512,9 +512,13 @@ class GameManager:
             self.target_camera_y = self.window_height / 1.8
             self.camera_animating = True
             
-            # Hide all game buttons
+            # Hide all game buttons except level buttons
             for button in self.stage.buttons:
-                button.set_visible(False)
+                if not hasattr(button, 'is_level_button') or not button.is_level_button:
+                    button.set_visible(False)
+                else:
+                    # ปุ่มเปลี่ยนแมพยังคงแสดงในโหมด PLAYING
+                    button.set_visible(True)
             
             # ถ้าไม่มีการ์ดวางอยู่ในช่อง ให้ข้ามการตั้งเวลาเริ่มอัลกอริทึม
             has_cards = False
@@ -825,17 +829,20 @@ class GameManager:
             for button in self.stage.buttons:
                 if hasattr(button, 'is_level_button') and button.is_level_button:
                     # Level buttons should always stay at fixed position on top
-                    # วาดปุ่มในตำแหน่งปกติโดยไม่คำนึงถึงตำแหน่งของกล้อง
-                    original_pos = button.position
-                    button.rect.center = original_pos  # ตำแหน่งเดิมของปุ่ม ไม่ขึ้นกับกล้อง
-                    button.draw(self.screen)
+                    # แสดงปุ่มเปลี่ยนแมพเฉพาะเมื่อกล้องอยู่ด้านบน (camera_y > 150) 
+                    # หรืออยู่ในสถานะ PLAYING เท่านั้น
+                    if self.camera_y > 150 or self.game_state.get_state() == GameStateEnum.PLAYING.value:
+                        # วาดปุ่มในตำแหน่งปกติโดยไม่คำนึงถึงตำแหน่งของกล้อง
+                        original_pos = button.position
+                        button.rect.center = original_pos  # ตำแหน่งเดิมของปุ่ม ไม่ขึ้นกับกล้อง
+                        button.draw(self.screen)
                 else:
                     # Other buttons move with camera
                     button.draw(self.screen, camera_offset)
             
             # Display information only when camera is at the top (camera_y > 0)
             # Do not display information when camera moves down (camera_y <= 0)
-            if self.camera_y > 0:
+            if self.camera_y > 150:  # เปลี่ยนจาก 0 เป็น 150 เพื่อให้ข้อมูลหายเร็วขึ้น
                 # Display information at normal position
                 current_level = self.game_state.get_current_level()
                 username = self.game_state.get_username()

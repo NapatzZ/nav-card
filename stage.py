@@ -354,9 +354,9 @@ class Stage:
         start_pos = (Config.BOARD_WIDTH * 2 // 4, Config.BOARD_HEIGHT - 80)
         
         # Position of level change buttons at the top of the screen
-        # ปรับตำแหน่งของปุ่มเปลี่ยนระดับให้อยู่ในจอและสามารถกดได้
-        left_button_pos = (80, 100)  # ปุ่มซ้ายอยู่ด้านซ้ายของจอ
-        right_button_pos = (Config.BOARD_WIDTH - 80, 100)  # ปุ่มขวาอยู่ด้านขวาของจอ
+        # ตำแหน่งเดิม: left_button_pos = (80, 100), right_button_pos = (Config.BOARD_WIDTH - 80, 100)
+        left_button_pos = (75, 160)  # ปุ่มซ้ายอยู่ด้านซ้ายของจอ
+        right_button_pos = (1108, 160)  # ปุ่มขวาอยู่ด้านขวาของจอ
         
         # Create buttons
         reset_button = Button(reset_pos, "assets/reset_button.png", "reset")
