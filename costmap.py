@@ -401,8 +401,11 @@ class Costmap:
                 # Update the grid
                 self.grid = binary_array
                 
-                # Automatically set robot and goal positions on free spaces
-                self.set_default_robot_and_goal_positions()
+                # ไม่ตั้งค่าตำแหน่งโดยอัตโนมัติอีกต่อไป เพื่อให้สามารถใช้ค่าจาก levels.csv ได้
+                # ถ้ายังไม่มีการตั้งค่าตำแหน่งหุ่นยนต์และเป้าหมาย จึงค่อยเรียกใช้ 
+                if self.robot_pos is None or self.goal_pos is None:
+                    print(f"No robot or goal positions set, using default positions")
+                    self.set_default_robot_and_goal_positions()
                 
                 print(f"Loaded map from {pgm_path} with dimensions {self.grid.shape}")
                 return True

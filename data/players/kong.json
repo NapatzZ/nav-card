@@ -1,0 +1,16 @@
+{
+    "username": "kong",
+    "current_level": 3,
+    "highest_completed_level": 2,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS"
+        ],
+        "Collision avoidance": [],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}

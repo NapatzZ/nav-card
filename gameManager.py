@@ -385,6 +385,7 @@ class GameManager:
         try:
             # Get current level number
             current_level = self.game_state.get_current_level()
+            print(f"[GameManager] Loading map and settings for level {current_level}")
             
             # Update level in statistics
             self.statistics.set_level(current_level)
@@ -395,22 +396,43 @@ class GameManager:
             levels_csv_path = os.path.join("data", "levels.csv")
             
             if os.path.exists(levels_csv_path):
+                print(f"[GameManager] Reading level data from {levels_csv_path}")
                 with open(levels_csv_path, 'r') as csvfile:
                     csv_reader = csv.DictReader(csvfile)
-                    for row in csv_reader:
-                        map_level = row['map'].replace('map', '').replace('.pgm', '')
-                        if int(map_level) == current_level:
-                            level_data = row
-                            break
+                    # แสดงข้อมูลทั้งหมดที่อ่านได้จาก levels.csv เพื่อความชัดเจน
+                    all_rows = list(csv_reader)
+                    print(f"[GameManager] Found {len(all_rows)} level entries in levels.csv")
+                    
+                    for row in all_rows:
+                        map_name = row['map']
+                        map_level = map_name.replace('map', '').replace('.pgm', '')
+                        try:
+                            map_level_num = int(map_level)
+                            if map_level_num == current_level:
+                                level_data = row
+                                print(f"[GameManager] Found data for level {current_level}: {level_data}")
+                                break
+                        except ValueError:
+                            print(f"[GameManager] Warning: Invalid map name format: {map_name}")
+            else:
+                print(f"[GameManager] Warning: levels.csv not found at {levels_csv_path}")
             
             # Create map filename based on level
             map_file = f"map{current_level}.pgm"
             pgm_file_path = os.path.join("data", map_file)
             
             if os.path.exists(pgm_file_path):
+                # ก่อนโหลดแมพ เคลียร์ตำแหน่งหุ่นยนต์และเป้าหมายก่อน เพื่อให้แน่ใจว่าจะใช้ค่าจาก levels.csv
+                if hasattr(self.costmap, 'robot_pos'):
+                    self.costmap.robot_pos = None
+                if hasattr(self.costmap, 'goal_pos'):
+                    self.costmap.goal_pos = None
+                if hasattr(self.costmap, 'start_pos'):
+                    self.costmap.start_pos = None
+                
                 success = self.costmap.load_pgm_map(pgm_file_path)
                 if success:
-                    print(f"Successfully loaded map for level {current_level} from {pgm_file_path}")
+                    print(f"[GameManager] Successfully loaded map for level {current_level} from {pgm_file_path}")
                     
                     # If we have data from levels.csv, set start position and goal
                     if level_data:
@@ -418,6 +440,7 @@ class GameManager:
                         start_row = int(level_data['start_row'])
                         start_col = int(level_data['start_col'])
                         self.costmap.set_robot_position(start_row, start_col)
+                        self.costmap.start_pos = (start_row, start_col)  # เก็บตำแหน่งเริ่มต้นไว้อ้างอิง
                         
                         # Set goal position
                         finish_row = int(level_data['finish_row'])
@@ -427,19 +450,27 @@ class GameManager:
                         # Set time limit for this level
                         time_limit = int(level_data['time_limit'])
                         self.statistics.set_time_limit(time_limit)
-                        print(f"Set time limit for level {current_level} to {time_limit} seconds")
                         
-                        print(f"Set robot position to ({start_row}, {start_col}) and goal to ({finish_row}, {finish_col})")
+                        print(f"[GameManager] Applied level {current_level} settings from levels.csv:")
+                        print(f"[GameManager] Robot start position: ({start_row}, {start_col})")
+                        print(f"[GameManager] Goal position: ({finish_row}, {finish_col})")
+                        print(f"[GameManager] Time limit: {time_limit} seconds")
+                    else:
+                        print(f"[GameManager] Warning: No data found for level {current_level} in levels.csv")
+                        # Use default positions
+                        self.costmap.set_default_robot_and_goal_positions()
                 else:
-                    print(f"Failed to load map for level {current_level} from {pgm_file_path}")
+                    print(f"[GameManager] Failed to load map for level {current_level} from {pgm_file_path}")
                     # If loading fails, use general map
                     self.load_map()
             else:
-                print(f"No map file found for level {current_level} at {pgm_file_path}")
+                print(f"[GameManager] No map file found for level {current_level} at {pgm_file_path}")
                 # If no map file for this level, use general map
                 self.load_map()
         except Exception as e:
-            print(f"Error loading level map: {e}")
+            print(f"[GameManager] Error loading level map: {e}")
+            import traceback
+            traceback.print_exc()
             # Continue without crashing
     
     def reset_game(self):
@@ -458,6 +489,9 @@ class GameManager:
             
             # Reset the costmap
             self.costmap.reset()
+            
+            # ตรวจสอบและอัพเดต time limit เพื่อความถูกต้อง
+            self.__check_and_update_time_limit()
             
             # Recalculate camera position
             self.target_camera_y = 0
@@ -536,6 +570,9 @@ class GameManager:
             
             # ตรวจสอบและรีเซ็ตตำแหน่งหุ่นยนต์ถ้าไม่ได้อยู่ที่จุดเริ่มต้น
             self.__check_and_reset_robot_position()
+            
+            # ตรวจสอบและตั้งค่า time_limit ที่ถูกต้องสำหรับด่านนี้อีกครั้ง
+            self.__check_and_update_time_limit()
             
             # Set camera target position to move down half the screen (use positive value)
             self.target_camera_y = self.window_height / 1.8
@@ -757,6 +794,12 @@ class GameManager:
             
             # Check time limit when in PLAYING mode
             if self.game_state.get_state() == GameStateEnum.PLAYING.value and self.statistics.is_timing:
+                # แน่ใจว่าใช้ time limit ที่ถูกต้องอยู่เสมอ
+                correct_time_limit = self.__get_correct_time_limit_for_level()
+                if correct_time_limit and correct_time_limit != self.statistics.time_limit:
+                    print(f"[GameManager] Time limit was incorrect: {self.statistics.time_limit}, updating to {correct_time_limit}")
+                    self.statistics.set_time_limit(correct_time_limit)
+                
                 elapsed_time = self.statistics.get_elapsed_time()
                 time_limit = self.statistics.get_time_limit()
                 
@@ -955,6 +998,13 @@ class GameManager:
                 
                 # Display elapsed time and time limit
                 time_limit = self.statistics.get_time_limit()
+                # ตรวจสอบอีกครั้งว่า time_limit ที่จะแสดงถูกต้อง
+                correct_time_limit = self.__get_correct_time_limit_for_level()
+                if correct_time_limit and correct_time_limit != time_limit:
+                    print(f"[GameManager] Time limit was incorrect in display: {time_limit}, should be {correct_time_limit}")
+                    self.statistics.set_time_limit(correct_time_limit)
+                    time_limit = correct_time_limit
+
                 timer_text = self.timer_font.render(f"{formatted_time} / {self.statistics.format_time(time_limit)}", True, Config.WHITE_COLOR)
                 timer_text_rect = timer_text.get_rect(center=timer_rect.center)
                 self.screen.blit(timer_text, timer_text_rect)
@@ -1191,6 +1241,9 @@ class GameManager:
             # Load map for the new level
             self.load_current_level_map()
             
+            # ตรวจสอบและอัพเดต time limit เพื่อความถูกต้อง
+            self.__check_and_update_time_limit()
+            
             # รีเซ็ตการ์ดกลับเข้า deck
             self.card_deck.reset_cards()
             print("[GameManager] All cards have been reset to deck")
@@ -1266,6 +1319,9 @@ class GameManager:
             # Load map for new level
             self.load_current_level_map()
             print(f"[GameManager] Loaded map for level {self.game_state.get_current_level()}")
+            
+            # ตรวจสอบและอัพเดต time limit เพื่อความถูกต้อง
+            self.__check_and_update_time_limit()
             
             # If cards were unlocked, show notification and update available cards
             if newly_unlocked:
@@ -1370,21 +1426,167 @@ class GameManager:
         ถ้าไม่ใช่ ให้รีเซ็ตแมพและตำแหน่งหุ่นยนต์
         """
         try:
-            # ตรวจสอบว่า costmap มีการกำหนดตำแหน่งหุ่นยนต์และตำแหน่งเริ่มต้นหรือไม่
-            if hasattr(self.costmap, 'robot_pos') and hasattr(self.costmap, 'start_pos') and self.costmap.robot_pos and self.costmap.start_pos:
-                # ตรวจสอบว่าตำแหน่งปัจจุบันของหุ่นยนต์ตรงกับตำแหน่งเริ่มต้นหรือไม่
-                if self.costmap.robot_pos != self.costmap.start_pos:
-                    print(f"[GameManager] Robot not at start position. Resetting map.")
-                    print(f"[GameManager] Current: {self.costmap.robot_pos}, Start: {self.costmap.start_pos}")
+            # ดึงค่าระดับปัจจุบัน
+            current_level = self.game_state.get_current_level()
+            
+            # อ่านข้อมูลจาก levels.csv
+            import csv
+            level_data = None
+            levels_csv_path = os.path.join("data", "levels.csv")
+            
+            if os.path.exists(levels_csv_path):
+                with open(levels_csv_path, 'r') as csvfile:
+                    csv_reader = csv.DictReader(csvfile)
+                    for row in csv_reader:
+                        map_level = row['map'].replace('map', '').replace('.pgm', '')
+                        try:
+                            if int(map_level) == current_level:
+                                level_data = row
+                                break
+                        except ValueError:
+                            continue
+            
+            # ถ้าพบข้อมูลใน levels.csv
+            if level_data:
+                start_row = int(level_data['start_row'])
+                start_col = int(level_data['start_col'])
+                correct_start_pos = (start_row, start_col)
+                
+                # ตรวจสอบว่า start_pos ที่ตั้งไว้ถูกต้องหรือไม่
+                if hasattr(self.costmap, 'start_pos') and self.costmap.start_pos != correct_start_pos:
+                    print(f"[GameManager] Incorrect start position detected: {self.costmap.start_pos}, should be {correct_start_pos}")
+                    # แก้ไขตำแหน่งเริ่มต้นให้ถูกต้อง
+                    self.costmap.start_pos = correct_start_pos
+                
+                # ตรวจสอบว่าหุ่นยนต์อยู่ที่ตำแหน่งเริ่มต้นหรือไม่
+                if hasattr(self.costmap, 'robot_pos') and self.costmap.robot_pos != correct_start_pos:
+                    print(f"[GameManager] Robot not at correct start position. Resetting position.")
+                    print(f"[GameManager] Current: {self.costmap.robot_pos}, Should be: {correct_start_pos}")
                     
-                    # รีเซ็ตแมพและตำแหน่งหุ่นยนต์
+                    # รีเซ็ตแมพ (เฉพาะเส้นทาง) และตำแหน่งหุ่นยนต์
                     self.costmap.reset()
                     
-                    # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้น
-                    if self.costmap.start_pos:
-                        start_row, start_col = self.costmap.start_pos
-                        self.costmap.set_robot_position(start_row, start_col)
-                        print(f"[GameManager] Robot reset to start position: {self.costmap.start_pos}")
+                    # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้นที่ถูกต้อง
+                    self.costmap.set_robot_position(start_row, start_col)
+                    self.costmap.start_pos = correct_start_pos
+                    print(f"[GameManager] Robot reset to correct start position: {correct_start_pos}")
+                
+                # ตรวจสอบว่าเป้าหมายถูกต้องหรือไม่
+                finish_row = int(level_data['finish_row'])
+                finish_col = int(level_data['finish_col'])
+                correct_goal_pos = (finish_row, finish_col)
+                
+                if hasattr(self.costmap, 'goal_pos') and self.costmap.goal_pos != correct_goal_pos:
+                    print(f"[GameManager] Incorrect goal position detected: {self.costmap.goal_pos}, should be {correct_goal_pos}")
+                    # แก้ไขตำแหน่งเป้าหมายให้ถูกต้อง
+                    self.costmap.set_goal_position(finish_row, finish_col)
+                    print(f"[GameManager] Goal reset to correct position: {correct_goal_pos}")
+                
+                # ตรวจสอบว่าค่า time_limit ถูกต้องหรือไม่
+                time_limit = int(level_data['time_limit'])
+                if self.statistics.time_limit != time_limit:
+                    print(f"[GameManager] Incorrect time limit detected: {self.statistics.time_limit}, should be {time_limit}")
+                    # แก้ไขค่า time_limit ให้ถูกต้อง
+                    self.statistics.set_time_limit(time_limit)
+                    print(f"[GameManager] Time limit corrected to {time_limit} seconds")
+                
+            else:
+                print(f"[GameManager] Warning: No data found for level {current_level} in levels.csv")
+                # กรณีไม่พบข้อมูลใน levels.csv ให้ใช้ค่า start_pos ที่มีอยู่
+                if hasattr(self.costmap, 'robot_pos') and hasattr(self.costmap, 'start_pos') and self.costmap.start_pos:
+                    if self.costmap.robot_pos != self.costmap.start_pos:
+                        print(f"[GameManager] Robot not at start position. Resetting map.")
+                        print(f"[GameManager] Current: {self.costmap.robot_pos}, Start: {self.costmap.start_pos}")
+                        
+                        # รีเซ็ตแมพและตำแหน่งหุ่นยนต์
+                        self.costmap.reset()
+                        
+                        # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้น
+                        if self.costmap.start_pos:
+                            start_row, start_col = self.costmap.start_pos
+                            self.costmap.set_robot_position(start_row, start_col)
+                            print(f"[GameManager] Robot reset to start position: {self.costmap.start_pos}")
         except Exception as e:
             print(f"[GameManager] Error checking/resetting robot position: {e}")
+            import traceback
+            traceback.print_exc()
             # Continue without crashing
+
+    def __check_and_update_time_limit(self):
+        """
+        Check and update time limit for the current level
+        """
+        try:
+            # Get current level number
+            current_level = self.game_state.get_current_level()
+            
+            # Read data from levels.csv
+            import csv
+            level_data = None
+            levels_csv_path = os.path.join("data", "levels.csv")
+            
+            if os.path.exists(levels_csv_path):
+                with open(levels_csv_path, 'r') as csvfile:
+                    csv_reader = csv.DictReader(csvfile)
+                    for row in csv_reader:
+                        map_level = row['map'].replace('map', '').replace('.pgm', '')
+                        try:
+                            if int(map_level) == current_level:
+                                level_data = row
+                                break
+                        except ValueError:
+                            continue
+            
+            # If we have data from levels.csv, set time limit
+            if level_data:
+                time_limit = int(level_data['time_limit'])
+                if self.statistics.time_limit != time_limit:
+                    print(f"[GameManager] Incorrect time limit detected: {self.statistics.time_limit}, should be {time_limit}")
+                    # Update time limit
+                    self.statistics.set_time_limit(time_limit)
+                    print(f"[GameManager] Time limit corrected to {time_limit} seconds")
+            else:
+                print(f"[GameManager] Warning: No data found for level {current_level} in levels.csv")
+        except Exception as e:
+            print(f"[GameManager] Error checking/updating time limit: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue without crashing
+
+    def __get_correct_time_limit_for_level(self):
+        """
+        Get the correct time limit for the current level
+        """
+        try:
+            # Get current level number
+            current_level = self.game_state.get_current_level()
+            
+            # Read data from levels.csv
+            import csv
+            level_data = None
+            levels_csv_path = os.path.join("data", "levels.csv")
+            
+            if os.path.exists(levels_csv_path):
+                with open(levels_csv_path, 'r') as csvfile:
+                    csv_reader = csv.DictReader(csvfile)
+                    for row in csv_reader:
+                        map_level = row['map'].replace('map', '').replace('.pgm', '')
+                        try:
+                            if int(map_level) == current_level:
+                                level_data = row
+                                break
+                        except ValueError:
+                            continue
+            
+            # If we have data from levels.csv, return time limit
+            if level_data:
+                return int(level_data['time_limit'])
+            else:
+                print(f"[GameManager] Warning: No data found for level {current_level} in levels.csv")
+                return None
+        except Exception as e:
+            print(f"[GameManager] Error getting correct time limit: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue without crashing
+            return None

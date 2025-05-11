@@ -1,0 +1,18 @@
+{
+    "username": "captain",
+    "current_level": 4,
+    "highest_completed_level": 3,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS"
+        ],
+        "Collision avoidance": [
+            "VFH"
+        ],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}
