@@ -5,7 +5,6 @@ import pygame
 from typing import List, Tuple, Optional
 from card import Card, CardType
 from config import Config
-import os
 
 class Button:
     """
@@ -18,7 +17,7 @@ class Button:
         rect (pygame.Rect): Rectangle for click detection
         is_hovered (bool): Whether mouse is hovering over button
         is_visible (bool): Whether button is visible
-        is_level_button (bool): Whether this is a level button
+        is_level_button (bool): Whether this is a level change button
     """
     
     def __init__(self, position: Tuple[int, int], image_path: str, action_name: str):
@@ -27,54 +26,34 @@ class Button:
         
         Args:
             position (Tuple[int, int]): Position of the button
-            image_path (str): Path to the image file or None for text-only button
+            image_path (str): Path to the image file
             action_name (str): Name of the action when clicked
         """
         self.position = position
         self.action_name = action_name
         self.is_level_button = False  # By default, buttons move with camera
         
-        if image_path:
-            try:
-                self.image = pygame.image.load(image_path)
+        try:
+            self.image = pygame.image.load(image_path)
+            # ลดขนาดปุ่มลงเหลือ 80x80 หรือขนาดที่เหมาะสม
+            if "left" in image_path.lower() or "right" in image_path.lower():
+                # ปุ่มเปลี่ยนระดับมีขนาดเล็กกว่า
+                self.image = pygame.transform.scale(self.image, (80, 80))
+            else:
+                # ปุ่มอื่นๆ ยังคงมีขนาดใหญ่
                 self.image = pygame.transform.scale(self.image, (250, 150))
-            except pygame.error:
-                self._create_text_button()
-        else:
-            # สร้างปุ่มที่เป็นข้อความ
-            self._create_text_button()
+        except pygame.error:
+            self.image = pygame.Surface((100, 50))
+            self.image.fill((150, 150, 150))
+            font = pygame.font.Font(None, 24)
+            text = font.render(action_name, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(50, 25))
+            self.image.blit(text, text_rect)
         
         self.rect = self.image.get_rect(center=position)
         self.is_hovered = False
         self.is_visible = True
-    
-    def _create_text_button(self):
-        """สร้างปุ่มโดยใช้ข้อความแทนรูปภาพ"""
-        button_width = 250
-        button_height = 150
         
-        self.image = pygame.Surface((button_width, button_height), pygame.SRCALPHA)
-        self.image.fill((100, 100, 100, 200))  # พื้นหลังสีเทาโปร่งใส
-        
-        # วาดขอบสี่เหลี่ยม
-        pygame.draw.rect(self.image, (200, 200, 200), 
-                        (0, 0, button_width, button_height), 3, border_radius=10)
-        
-        # แสดงข้อความตรงกลาง
-        display_text = self.action_name.upper()
-        
-        # เลือกขนาดฟอนต์ตามความยาวของข้อความ
-        font_size = 48 if len(display_text) < 10 else 36
-        
-        try:
-            font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", font_size)
-        except:
-            font = pygame.font.Font(None, font_size)  # ใช้ฟอนต์เริ่มต้นถ้าไม่พบฟอนต์ที่กำหนด
-            
-        text = font.render(display_text, True, (255, 255, 255))
-        text_rect = text.get_rect(center=(button_width // 2, button_height // 2))
-        self.image.blit(text, text_rect)
-    
     def set_visible(self, visible: bool):
         """
         Set the visibility of the button.
@@ -94,15 +73,27 @@ class Button:
         """
         if not self.is_visible:
             return
+        
+        # สำหรับปุ่มเปลี่ยนระดับ ไม่ต้องปรับ offset ตามกล้อง
+        if hasattr(self, 'is_level_button') and self.is_level_button:
+            # ปุ่มเปลี่ยนระดับแสดงในตำแหน่งปกติ
+            draw_rect = self.rect.copy()
+        else:
+            # ปุ่มอื่นๆ ปรับตำแหน่งตามกล้อง
+            draw_rect = self.rect.copy()
+            draw_rect.center = (self.rect.centerx + camera_offset[0], self.rect.centery + camera_offset[1])
             
         if self.is_hovered:
-            scaled_image = pygame.transform.scale(self.image, 
-                                                 (int(self.rect.width * 1.25), 
-                                                  int(self.rect.height * 1.25)))
-            scaled_rect = scaled_image.get_rect(center=self.rect.center)
+            # คำนวณขนาดใหม่เมื่อเมาส์ชี้
+            scaled_width = int(self.rect.width * 1.25)
+            scaled_height = int(self.rect.height * 1.25)
+            scaled_image = pygame.transform.scale(self.image, (scaled_width, scaled_height))
+            
+            # สร้าง rect ใหม่สำหรับภาพที่ขยาย
+            scaled_rect = scaled_image.get_rect(center=draw_rect.center)
             screen.blit(scaled_image, scaled_rect)
         else:
-            screen.blit(self.image, self.rect)
+            screen.blit(self.image, draw_rect)
     
     def check_hover(self, mouse_pos: Tuple[int, int]) -> bool:
         """
@@ -117,7 +108,8 @@ class Button:
         if not self.is_visible:
             self.is_hovered = False
             return False
-            
+        
+        # ตรวจสอบว่าเมาส์อยู่เหนือปุ่มหรือไม่
         self.is_hovered = self.rect.collidepoint(mouse_pos)
         return self.is_hovered
     
@@ -354,72 +346,44 @@ class Stage:
         return surface
     
     def _initialize_buttons(self) -> List[Button]:
-        """
-        Initialize buttons for the stage.
-        
-        Returns:
-            List[Button]: List of button objects
-        """
-        # Dimensions
-        window_width, window_height = Config.get_window_dimensions()
-        
-        # แบ่งหน้าจอเป็น 3 ส่วนสำหรับปุ่มหลัก
-        reset_button_x = int(window_width * (1/6))  # ด้านซ้าย
-        start_button_x = int(window_width * (3/6))  # ตรงกลาง
-        stats_button_x = int(window_width * (5/6))  # ด้านขวา
-        
-        # กำหนดตำแหน่ง Y สำหรับปุ่มทั้งหมด (ปรับให้ต่ำลงอีก)
-        buttons_y = window_height + 100  # ปรับจาก 60 เป็น 40 เพื่อให้ปุ่มอยู่ชิดด้านล่างมากขึ้น
-        
-        # Create list of buttons
+        """Initialize buttons with their positions and actions."""
         buttons = []
         
-        # Add reset button (ซ้าย)
-        try:
-            reset_button = Button(
-                (reset_button_x, buttons_y),
-                os.path.join("assets", "reset_button.png"),
-                "reset"
-            )
-            buttons.append(reset_button)
-        except Exception as e:
-            print(f"Error loading reset button: {e}")
-            # สร้างปุ่มข้อความถ้าไม่พบรูปภาพ
-            reset_button = Button(
-                (reset_button_x, buttons_y),
-                None,
-                "reset"
-            )
-            buttons.append(reset_button)
+        # Calculate button positions
+        reset_pos = (Config.BOARD_WIDTH // 4, Config.BOARD_HEIGHT - 80)
+        start_pos = (Config.BOARD_WIDTH * 2 // 4, Config.BOARD_HEIGHT - 80)
         
-        # Add start button (กลาง)
-        try:
-            start_button = Button(
-                (start_button_x, buttons_y),
-                os.path.join("assets", "start_button.png"),
-                "start"
-            )
-            buttons.append(start_button)
-        except Exception as e:
-            print(f"Error loading start button: {e}")
-            # สร้างปุ่มข้อความถ้าไม่พบรูปภาพ
-            start_button = Button(
-                (start_button_x, buttons_y),
-                None,
-                "start"
-            )
-            buttons.append(start_button)
+        # Position of level change buttons at the top of the screen
+        # ปรับตำแหน่งของปุ่มเปลี่ยนระดับให้อยู่ในจอและสามารถกดได้
+        left_button_pos = (80, 100)  # ปุ่มซ้ายอยู่ด้านซ้ายของจอ
+        right_button_pos = (Config.BOARD_WIDTH - 80, 100)  # ปุ่มขวาอยู่ด้านขวาของจอ
         
-        # Add stats button (ขวา)
-        try:
-            stats_button = Button(
-                (stats_button_x, buttons_y),
-                None,  # ไม่มีไฟล์รูปภาพ ใช้ข้อความแทน
-                "stats"
-            )
-            buttons.append(stats_button)
-        except Exception as e:
-            print(f"Error creating stats button: {e}")
+        # Create buttons
+        reset_button = Button(reset_pos, "assets/reset_button.png", "reset")
+        start_button = Button(start_pos, "assets/start_button.png", "start")
+        
+        # Level change buttons - ตรวจสอบว่าปุ่มซ้ายใช้รูป left และปุ่มขวาใช้รูป right
+        left_button = Button(left_button_pos, "assets/leftValid.png", "prev_level_valid")
+        left_invalid_button = Button(left_button_pos, "assets/leftInvalid.png", "prev_level_invalid")
+        right_button = Button(right_button_pos, "assets/rightValid.png", "next_level_valid")
+        right_invalid_button = Button(right_button_pos, "assets/rightInvalid.png", "next_level_invalid")
+        
+        # Initially hide invalid buttons
+        left_invalid_button.set_visible(False)
+        right_invalid_button.set_visible(False)
+        
+        # Set which buttons are level buttons (don't move with camera)
+        left_button.is_level_button = True
+        left_invalid_button.is_level_button = True
+        right_button.is_level_button = True
+        right_invalid_button.is_level_button = True
+        
+        buttons.append(reset_button)
+        buttons.append(start_button)
+        buttons.append(left_button)
+        buttons.append(left_invalid_button)
+        buttons.append(right_button)
+        buttons.append(right_invalid_button)
         
         return buttons
 
@@ -518,7 +482,7 @@ class Stage:
         Args:
             mouse_pos (Tuple[int, int]): Mouse position (x, y)
         """
-        # Buttons don't move with camera_offset, so no need to adjust mouse position for hover check
+        # ตรวจสอบว่าเมาส์อยู่เหนือปุ่มใดบ้าง
         for button in self.buttons:
             button.check_hover(mouse_pos)
     
@@ -536,14 +500,7 @@ class Stage:
             if button.is_visible:
                 # ตรวจสอบว่าการคลิกอยู่ในปุ่มหรือไม่
                 if button.rect.collidepoint(mouse_pos):
-                    # ใช้ Config.log แทน print และแสดงตำแหน่งเมาส์
-                    Config.log("Stage", f"Button clicked: {button.action_name}", level=1, show_pos=True, mouse_pos=mouse_pos)
-                    
-                    # ถ้าเป็นปุ่ม stats ไม่ต้องส่งคืนค่า
-                    if button.action_name == "stats":
-                        # แสดงข้อความว่าฟีเจอร์นี้ยังไม่พร้อมใช้งาน
-                        return "show_message"
-                    
+                    print(f"[Stage] Button clicked: {button.action_name}")
                     return button.action_name
         
         return None
@@ -562,8 +519,7 @@ class Stage:
         # Adjust position considering camera offset
         adjusted_position = (position[0] - camera_offset[0], position[1] - camera_offset[1])
         
-        # แสดงข้อมูลการพยายามวาง card พร้อมตำแหน่ง
-        Config.log("Stage", f"Placing card: {card.card_name} ({card.card_type})", level=2, show_pos=True, mouse_pos=position)
+        print(f"[Stage] Attempting to place card at position: {adjusted_position}")
         
         # Find slot at the adjusted position
         for slot in self.slots:
@@ -574,7 +530,7 @@ class Stage:
             )
             
             if slot_rect.collidepoint(adjusted_position):
-                Config.log("Stage", f"Found slot for card type: {slot.card_type.value}", level=2)
+                print(f"[Stage] Found slot at position: {slot.position} for card type: {slot.card_type.value}")
                 result = slot.place_card(card)
                 
                 if result:
@@ -587,11 +543,11 @@ class Stage:
                     
                     # Update slot rect
                     card.rect.center = card.position
-                    Config.log("Stage", f"Card successfully placed", level=1)
+                    print(f"[Stage] Card successfully placed at {card.position}")
                 
                 return result
                 
-        Config.log("Stage", "No valid slot found at position", level=2, show_pos=True, mouse_pos=position)
+        print("[Stage] No valid slot found at position")
         return False
 
     def get_slot_at_position(self, pos: Tuple[int, int]) -> Optional[CardSlot]:
@@ -633,7 +589,7 @@ class Stage:
         """
         # Check if robot and goal positions are set
         if not costmap.robot_pos or not costmap.goal_pos:
-            Config.log("Stage", "Cannot start algorithm: Robot and goal positions must be set first", level=1)
+            print("Cannot start algorithm: Robot and goal positions must be set first")
             return False
             
         # Get cards in all slots
@@ -643,13 +599,12 @@ class Stage:
                 algorithm_cards.append(slot.card)
                 
         if not algorithm_cards:
-            Config.log("Stage", "Cannot start algorithm: Algorithm cards must be selected first", level=1)
+            print("Cannot start algorithm: Algorithm cards must be selected first")
             return False
             
         # Use first card for testing
         selected_card = algorithm_cards[0]
-        # แสดงข้อมูลอัลกอริทึมที่เลือกใช้ (ควรแสดงเสมอ - level 1)
-        Config.log("Stage", f"Selected algorithm: {selected_card.card_name} ({selected_card.card_type})", level=1)
+        print(f"Using algorithm: {selected_card.card_name} ({selected_card.card_type})")
         
         # Import algorithm modules
         from algorithms.navigation import NAVIGATION_ALGORITHMS
@@ -666,7 +621,7 @@ class Stage:
             algorithm_class = RECOVERY_ALGORITHMS.get(selected_card.card_name)
             
         if not algorithm_class:
-            Config.log("Stage", f"Algorithm not found for card: {selected_card.card_name}", level=1)
+            print(f"Algorithm not found for card: {selected_card.card_name}")
             return False
             
         # Let GameManager create and manage algorithm instance

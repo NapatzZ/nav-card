@@ -1,7 +1,0 @@
-timestamp,username,level,algorithm_name,algorithm_type,recovery_attempts,success
-2023-04-23 16:30:10,test_user,2,BFS,Navigation,1,0
-2023-04-23 16:45:30,test_user,2,BFS,Navigation,1,1
-2023-04-23 17:15:45,test_user,3,AStar,Navigation,2,0
-2023-04-23 17:35:20,test_user,3,AStar,Navigation,1,1
-2023-04-24 10:35:12,player2,2,BFS,Navigation,1,0
-2023-04-24 11:00:30,player2,2,Dijkstra,Navigation,0,1 

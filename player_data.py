@@ -110,6 +110,25 @@ class PlayerData:
             with open(player_file, 'r', encoding='utf-8') as f:
                 player_data = json.load(f)
             
+            # ตรวจสอบว่าข้อมูลมีครบทุกฟิลด์
+            required_fields = ["username", "current_level", "highest_completed_level", "unlocked_cards"]
+            for field in required_fields:
+                if field not in player_data:
+                    print(f"[PlayerData] Warning: Missing field '{field}' in player data")
+                    # กำหนดค่าเริ่มต้น
+                    if field == "username":
+                        player_data[field] = username
+                    elif field == "current_level":
+                        player_data[field] = 1
+                    elif field == "highest_completed_level":
+                        player_data[field] = 0
+                    elif field == "unlocked_cards":
+                        player_data[field] = {
+                            "Navigation": ["DFS"],
+                            "Collision avoidance": [],
+                            "Recovery": []
+                        }
+            
             # Get the game state instance
             game_state = GameState()
             
@@ -121,7 +140,11 @@ class PlayerData:
             print(f"[PlayerData] Loaded player data for {username}")
             print(f"  Level: {game_state.current_level}")
             print(f"  Highest completed level: {game_state.highest_completed_level}")
-            print(f"  Unlocked cards: {len([card for cards in game_state.unlocked_cards.values() for card in cards])} cards")
+            
+            # แสดงรายละเอียดการ์ดที่ปลดล็อกทั้งหมด
+            print(f"  Unlocked cards details:")
+            for card_type, cards in game_state.unlocked_cards.items():
+                print(f"    {card_type}: {cards}")
             
             return True
         except Exception as e:

@@ -1,0 +1,13 @@
+{
+    "username": "jadi",
+    "current_level": 2,
+    "highest_completed_level": 1,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS"
+        ],
+        "Collision avoidance": [],
+        "Recovery": []
+    }
+}

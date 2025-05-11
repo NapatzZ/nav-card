@@ -1,4 +1,3 @@
-Username,Total Plays,Success Count,Success Rate (%),Levels Played,Avg Time (s),Avg Recovery Attempts,Best Level Times
-test_user,7,5,71.43,"1,2,3",130.91,0.71,Level 1: 01:23.200; Level 2: 02:10.500; Level 3: 02:40.400
-player2,3,2,66.67,"1,2",122.73,0.33,Level 1: 01:45.200; Level 2: 02:00.299
-napat,2,2,100.0,"1,2",12.06,0.0,Level 1: 00:11.507; Level 2: 00:12.612
+username,total_plays,success_count,success_rate,levels_played,average_time,best_level_times
+jadi,1,1,100.0,1,00:43.889,Level 1: 00:43.889
+Ulike,1,1,100.0,1,00:43.859,Level 1: 00:43.859

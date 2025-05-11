@@ -124,6 +124,34 @@ class GameManager:
                 self.statistics.set_username(username)
                 self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
                 print(f"User logged in as: {username}")
+                
+                # ตรวจสอบว่าเป็นผู้เล่นเก่าที่โหลดข้อมูลมาหรือไม่
+                if self.login_screen.is_returning_player:
+                    print(f"[GameManager] Updating cards for returning player: {username}")
+                    
+                    # แสดงข้อมูลการ์ดที่ปลดล็อกจาก GameState
+                    unlocked_cards = self.game_state.get_unlocked_cards()
+                    print(f"[GameManager] Unlocked cards from GameState:")
+                    for card_type, cards in unlocked_cards.items():
+                        print(f"  {card_type}: {cards}")
+                    
+                    # ลำดับการทำงานสำคัญมาก:
+                    # 1. อัปเดตการ์ดในเด็คตามข้อมูลที่โหลดมา
+                    cards_added = self.card_deck.update_available_cards()
+                    print(f"[GameManager] Cards updated: {cards_added}")
+                    
+                    # 2. โหลดแผนที่ของระดับปัจจุบัน (ต้องทำก่อน reset_game)
+                    self.load_current_level_map()
+                    
+                    # 3. อัปเดตปุ่มเลือกระดับตามระดับปัจจุบัน (ต้องทำก่อน reset_game)
+                    self.update_level_buttons()
+                    
+                    # 4. รีเซ็ตเกมเพื่อให้แน่ใจว่าทุกอย่างถูกตั้งค่าอย่างถูกต้อง
+                    # รวมถึงการรีเซ็ตการ์ดด้วย
+                    self.reset_game()
+                    
+                    print(f"[GameManager] Player data loaded and game initialized successfully.")
+                
             return
             
         # ตรวจสอบการกด ESC เพื่อเข้าสู่โหมด PAUSE
@@ -251,16 +279,25 @@ class GameManager:
             # Handle button clicks
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 try:
-                    # บันทึกตำแหน่งเมาส์เมื่อคลิก (ข้อมูลสำคัญ - level 1)
-                    if Config.LOG_MOUSE_POSITION:
-                        Config.log("GameManager", f"Mouse clicked", level=2, show_pos=True, mouse_pos=event.pos)
-                        
-                    # Send camera position as well
-                    button_action = self.stage.handle_button_click(event.pos)
-                    if button_action:
-                        self.handle_button_action(button_action)
+                    # แยกจัดการสำหรับปุ่มที่เป็น level_button
+                    button_clicked = False
+                    for button in self.stage.buttons:
+                        if hasattr(button, 'is_level_button') and button.is_level_button and button.is_visible:
+                            # ปุ่มเปลี่ยนระดับต้องใช้ตำแหน่งเมาส์โดยตรง ไม่ต้องปรับ offset
+                            if button.rect.collidepoint(event.pos):
+                                print(f"[GameManager] Level button clicked: {button.action_name}")
+                                self.handle_button_action(button.action_name)
+                                button_clicked = True
+                                break
+                    
+                    # ถ้ายังไม่มีการคลิกปุ่มเปลี่ยนระดับ ให้ตรวจสอบปุ่มอื่นๆ
+                    if not button_clicked:
+                        # ส่งตำแหน่งเมาส์ไปยัง stage เพื่อตรวจสอบการคลิกปุ่มอื่นๆ
+                        button_action = self.stage.handle_button_click(event.pos)
+                        if button_action:
+                            self.handle_button_action(button_action)
                 except Exception as e:
-                    Config.log("GameManager", f"Error handling button click: {e}", level=1)
+                    print(f"Error handling button click: {e}")
                     # Continue without crashing
         
         try:
@@ -294,8 +331,7 @@ class GameManager:
         Args:
             action (str): Action name from the button
         """
-        # แสดงข้อมูลการคลิกปุ่ม (ข้อมูลสำคัญ - level 1)
-        Config.log("GameManager", f"Button clicked: {action}", level=1)
+        print(f"[GameManager] Handling button action: {action}")
         
         try:
             # Try to perform the action
@@ -307,19 +343,11 @@ class GameManager:
                 # Reset game
                 self.reset_game()
                 
-            elif action == "stats":
-                # Show statistics window
-                self.show_statistics()
-                
-            elif action == "show_message":
-                # Show message about stats feature
-                self._show_stats_message()
-                
-            elif action == "next_level":
+            elif action == "next_level_valid":
                 # Go to next level
                 self.advance_to_next_level()
                 
-            elif action == "prev_level":
+            elif action == "prev_level_valid":
                 # Go to previous level
                 self.go_to_previous_level()
             
@@ -328,57 +356,7 @@ class GameManager:
             
         except Exception as e:
             print(f"Error handling button action: {e}")
-    
-    def _show_stats_message(self):
-        """Show message about stats feature."""
-        try:
-            # Create a semi-transparent overlay
-            overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))  # Black with 70% opacity
             
-            # Create message font
-            try:
-                font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
-            except:
-                font = pygame.font.SysFont(None, 36)
-            
-            # Messages to display
-            messages = [
-                "คุณสมบัติสถิติยังไม่พร้อมใช้งาน",
-                "เกิดปัญหาความไม่เข้ากันระหว่าง TKinter และ PyGame บน macOS",
-                "",
-                "ข้อมูลสถิติถูกบันทึกไว้ใน โฟลเดอร์ statistics/",
-                "",
-                "กดปุ่มใดก็ได้เพื่อกลับไปยังเกม"
-            ]
-            
-            # Render and blit each message
-            y_offset = self.window_height // 3
-            for msg in messages:
-                text_surface = font.render(msg, True, (255, 255, 255))
-                text_rect = text_surface.get_rect(center=(self.window_width // 2, y_offset))
-                overlay.blit(text_surface, text_rect)
-                y_offset += 50
-            
-            # Blit overlay to screen
-            self.screen.blit(overlay, (0, 0))
-            pygame.display.flip()
-            
-            # Wait for any key press to continue
-            waiting = True
-            while waiting:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        self.running = False
-                        waiting = False
-                    elif event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
-                        waiting = False
-                pygame.time.wait(50)
-        
-        except Exception as e:
-            print(f"Error showing stats message: {e}")
-            # Continue without crashing
-    
     def load_map(self):
         """
         Load a map from a PGM file.
@@ -488,6 +466,10 @@ class GameManager:
             # Change game state to CARD_CHOOSING
             self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
             
+            # Reset all cards back to the deck
+            self.card_deck.reset_cards()
+            print("[GameManager] All cards have been reset to deck")
+            
             # Set state to card selection mode (not gameplay mode)
             self.card_deck.set_game_stage(False)
             
@@ -534,17 +516,32 @@ class GameManager:
             for button in self.stage.buttons:
                 button.set_visible(False)
             
-            # Set timer for auto-starting algorithm after delay
-            self.algorithm_start_time = time.time()
-            self.should_auto_start = True
+            # ถ้าไม่มีการ์ดวางอยู่ในช่อง ให้ข้ามการตั้งเวลาเริ่มอัลกอริทึม
+            has_cards = False
+            for slot in self.stage.slots:
+                if slot.card:
+                    has_cards = True
+                    break
             
-            # Start timer
-            self.statistics.start_timer()
-            
-            # Show message to user about auto-starting
-            print("--------------------------------------------")
-            print(f"Game will start automatically in {self.auto_start_delay} seconds")
-            print("--------------------------------------------")
+            if has_cards:
+                # มีการ์ดวางอยู่ ตั้งเวลาสำหรับเริ่มอัลกอริทึมอัตโนมัติ
+                self.algorithm_start_time = time.time()
+                self.should_auto_start = True
+                
+                # Start timer
+                self.statistics.start_timer()
+                
+                # Show message to user about auto-starting
+                print("--------------------------------------------")
+                print(f"Game will start automatically in {self.auto_start_delay} seconds")
+                print("--------------------------------------------")
+            else:
+                # ไม่มีการ์ดวางอยู่ ข้ามการเริ่มอัลกอริทึมอัตโนมัติ
+                self.should_auto_start = False
+                print("--------------------------------------------")
+                print("No cards placed. Auto-start skipped. Viewing map only.")
+                print("--------------------------------------------")
+                
         except Exception as e:
             print(f"Error starting game: {e}")
             # Continue without crashing
@@ -552,24 +549,29 @@ class GameManager:
     def run_algorithm(self):
         """Run the selected algorithm."""
         try:
-            Config.log("GameManager", "Running algorithm...", level=1)
+            print("[GameManager] Running algorithm...")
+            
+            # ตรวจสอบก่อนว่ามีการวางการ์ดในช่องหรือไม่
+            has_cards = False
+            for slot in self.stage.slots:
+                if slot.card:
+                    has_cards = True
+                    break
+                    
+            if not has_cards:
+                print("[GameManager] No cards placed, cannot start algorithm")
+                return
             
             # บันทึกอัลกอริทึมที่ใช้
             algorithm_name, algorithm_type = self.stage.get_selected_algorithm()
             if algorithm_name:
                 self.statistics.set_algorithm(algorithm_name, algorithm_type)
-                # แสดงข้อมูลอัลกอริทึมที่เลือกใช้ (ข้อมูลสำคัญ - level 1)
-                Config.log("GameManager", f"Selected algorithm: {algorithm_name} ({algorithm_type})", level=1)
-            
-            # แสดงตำแหน่งปัจจุบันของหุ่นยนต์และเป้าหมาย
-            if self.costmap.robot_pos and self.costmap.goal_pos:
-                Config.log("GameManager", f"Robot position: {self.costmap.robot_pos}, Goal position: {self.costmap.goal_pos}", level=1)
             
             # เรียกอัลกอริทึมจาก stage
             result = self.stage.run_algorithm(self.costmap, self.statistics)
             
             if not result:
-                Config.log("GameManager", "Failed to start algorithm", level=1)
+                print("[GameManager] Failed to start algorithm")
                 return
                 
             algorithm_class, costmap = result
@@ -580,58 +582,49 @@ class GameManager:
             # เริ่มอัลกอริทึม
             success = self.current_algorithm.start()
             if not success:
-                Config.log("GameManager", "Failed to start algorithm", level=1)
+                print("[GameManager] Failed to start algorithm")
                 self.current_algorithm = None
                 return
                 
-            Config.log("GameManager", f"Algorithm {algorithm_name} is now running", level=1)
+            print("--------------------------------------------")
+            print(f"Algorithm {algorithm_name} is running, please wait...")
+            print("--------------------------------------------")
             
         except Exception as e:
-            Config.log("GameManager", f"Error running algorithm: {e}", level=1)
+            print(f"Error running algorithm: {e}")
             # Continue without crashing
     
     def on_algorithm_complete(self, success, path_length=0):
         """Handle completion of algorithm (robot reached goal or failed)."""
         try:
-            # ข้อมูลสรุปผลการทำงานของอัลกอริทึม (ข้อมูลสำคัญ - level 1)
-            Config.log("GameManager", f"Algorithm completed with success: {success}, path length: {path_length}", level=1)
-            
-            # แสดงเวลาที่ใช้ในการทำงาน
-            if self.statistics.is_timing:
-                elapsed_time = self.statistics.get_elapsed_time()
-                time_limit = self.statistics.get_time_limit()
-                Config.log("GameManager", f"Time used: {elapsed_time:.2f}/{time_limit} seconds", level=1)
+            print(f"[GameManager] Algorithm completed with success: {success}, path length: {path_length}")
             
             # Stop timer and save statistics
             if self.statistics.is_timing:
                 self.statistics.stop_timer()
                 self.statistics.set_completion_success(success)
-                # ลดระดับความสำคัญของข้อความนี้ลง (level 2)
-                Config.log("GameManager", f"Setting completion_success to: {success}", level=2)
+                print(f"[GameManager] Setting completion_success to: {success}")
                 self.statistics.save_all_data()
             
             # Mark level as completed if successful and change state to FINISH
             if success:
                 # Record that player has completed this level
                 completed = self.game_state.complete_current_level()
-                current_level = self.game_state.get_current_level()
-                Config.log("GameManager", f"Level {current_level} completed: {completed}", level=1)
+                print(f"[GameManager] Level completion status updated: {completed}")
                 
                 # Check if there are new cards to unlock for the next level
-                next_level = current_level + 1
+                next_level = self.game_state.get_current_level() + 1
                 if next_level <= 11:  # Ensure we're not beyond the last level
                     potential_unlocks = self.game_state.level_unlocks.get(next_level, [])
                     if potential_unlocks:
-                        # ข้อมูลเกี่ยวกับการปลดล็อคการ์ด (level 2)
-                        Config.log("GameManager", f"Potential cards to unlock at level {next_level}: {len(potential_unlocks)}", level=2)
+                        print(f"[GameManager] Potential cards to unlock at level {next_level}: {len(potential_unlocks)}")
                 
                 # Save player data
                 self.player_data.save_player_data(self.game_state.get_username())
             
             # Change to FINISH state after processing completion
             self.game_state.change_state(GameStateEnum.FINISH.value)
-            # แสดงข้อความการเปลี่ยนสถานะเกม (level 2)
-            Config.log("GameManager", f"State changed to FINISH. Success: {success}", level=2)
+            print(f"[GameManager] State changed to FINISH. Success: {success}")
             
             # Update level buttons to reflect new state - important for showing next level button
             self.update_level_buttons()
@@ -647,7 +640,7 @@ class GameManager:
                         button.set_visible(False)
             
         except Exception as e:
-            Config.log("GameManager", f"Error in algorithm complete callback: {e}", level=1)
+            print(f"Error in algorithm complete callback: {e}")
             # If error occurs, still set completion status to ensure proper display
             self.statistics.set_completion_success(success)
             # Ensure we change to FINISH state even if there's an error
@@ -824,19 +817,14 @@ class GameManager:
             # Draw buttons separately
             for button in self.stage.buttons:
                 if hasattr(button, 'is_level_button') and button.is_level_button:
-                    # Level buttons should always stay at the top (use camera_offset at the top)
-                    if self.camera_y > 0:
-                        # When camera moves down, display buttons at the original position
-                        original_pos = button.position
-                        button.rect.center = (original_pos[0], original_pos[1] + self.camera_y)
-                        button.draw(self.screen)
-                        button.rect.center = original_pos
-                    else:
-                        # When camera is at the top, display buttons normally
-                        button.draw(self.screen)
-                else:
-                    # Other buttons display normally
+                    # Level buttons should always stay at fixed position on top
+                    # วาดปุ่มในตำแหน่งปกติโดยไม่คำนึงถึงตำแหน่งของกล้อง
+                    original_pos = button.position
+                    button.rect.center = original_pos  # ตำแหน่งเดิมของปุ่ม ไม่ขึ้นกับกล้อง
                     button.draw(self.screen)
+                else:
+                    # Other buttons move with camera
+                    button.draw(self.screen, camera_offset)
             
             # Display information only when camera is at the top (camera_y > 0)
             # Do not display information when camera moves down (camera_y <= 0)
@@ -1010,8 +998,7 @@ class GameManager:
         """
         try:
             current_level = self.game_state.get_current_level()
-            # ใช้ log แทน print และใช้ระดับความสำคัญ 3 (verbose)
-            Config.log("GameManager", f"Updating level buttons for level {current_level}", level=3)
+            print(f"[GameManager] Updating level buttons for level {current_level}")
             
             # Find buttons from the button list
             left_valid_button = None
@@ -1043,8 +1030,7 @@ class GameManager:
                     
             # Check if can advance to next level
             can_advance = self.game_state.can_advance_to_level(current_level + 1)
-            # แสดงข้อมูลนี้เฉพาะเมื่อมีการเปลี่ยนแปลงหรือเมื่อจำเป็น (level 2)
-            Config.log("GameManager", f"Can advance to next level: {can_advance}", level=2)
+            print(f"[GameManager] Can advance to next level: {can_advance}")
             
             # If at last level or cannot advance to next level, right button will be invalid
             if current_level >= 11 or not can_advance:
@@ -1058,13 +1044,12 @@ class GameManager:
                 if right_invalid_button:
                     right_invalid_button.set_visible(False)
                     
-            # แสดงข้อมูลนี้เฉพาะสำหรับการ debug (level 3)
+            # Print button visibility status for debugging
             if left_valid_button and right_valid_button:
-                Config.log("GameManager", f"Left button visible: {left_valid_button.is_visible}, Right button visible: {right_valid_button.is_visible}", level=3)
+                print(f"[GameManager] Left button visible: {left_valid_button.is_visible}, Right button visible: {right_valid_button.is_visible}")
                 
         except Exception as e:
-            # ยังคงแสดงข้อความ error เสมอ (level 1)
-            Config.log("GameManager", f"Error updating level buttons: {e}", level=1)
+            print(f"Error updating level buttons: {e}")
             # Continue without crashing
             
     def go_to_previous_level(self):
@@ -1084,11 +1069,36 @@ class GameManager:
             new_level = self.game_state.get_current_level()
             print(f"Going back to level {new_level}")
             
+            # เก็บสถานะปัจจุบัน
+            current_state = self.game_state.get_state()
+            
             # Load map for the new level
             self.load_current_level_map()
             
-            # Reset game
-            self.reset_game()
+            # รีเซ็ตการ์ดกลับเข้า deck
+            self.card_deck.reset_cards()
+            print("[GameManager] All cards have been reset to deck")
+            
+            # รีเซ็ตแผนที่
+            self.costmap.reset()
+            
+            # อัปเดตปุ่มตามสถานะปัจจุบัน
+            if current_state == GameStateEnum.PLAYING.value:
+                # ถ้าอยู่ในโหมด PLAYING ให้ซ่อนปุ่มทั้งหมด (ยกเว้นปุ่มเลือกด่าน)
+                for button in self.stage.buttons:
+                    if not hasattr(button, 'is_level_button') or not button.is_level_button:
+                        button.set_visible(False)
+            else:
+                # ถ้าไม่ได้อยู่ในโหมด PLAYING ให้แสดงปุ่มทั้งหมด
+                for button in self.stage.buttons:
+                    button.set_visible(True)
+            
+            # อัปเดตปุ่มเลือกด่าน
+            self.update_level_buttons()
+            
+            # คงสถานะเดิมไว้
+            self.game_state.change_state(current_state)
+            print(f"[GameManager] Maintained state as: {current_state}")
             
         except Exception as e:
             print(f"Error going to previous level: {e}")
@@ -1104,6 +1114,9 @@ class GameManager:
             if not self.game_state.can_advance_to_level(current_level + 1):
                 print(f"[GameManager] Cannot advance to level {current_level + 1} yet. Complete level {current_level} first.")
                 return False
+            
+            # เก็บสถานะปัจจุบัน
+            current_state = self.game_state.get_state()
             
             # Mark current level as completed (in case it wasn't already)
             completed = self.game_state.complete_current_level()
@@ -1148,11 +1161,30 @@ class GameManager:
             # Save player data after advancing level
             self.player_data.save_player_data(self.game_state.get_username())
             
-            # Update level buttons to reflect the new level
+            # รีเซ็ตการ์ดกลับเข้า deck
+            self.card_deck.reset_cards()
+            print("[GameManager] All cards have been reset to deck")
+            
+            # รีเซ็ตแผนที่
+            self.costmap.reset()
+            
+            # อัปเดตปุ่มตามสถานะปัจจุบัน
+            if current_state == GameStateEnum.PLAYING.value:
+                # ถ้าอยู่ในโหมด PLAYING ให้ซ่อนปุ่มทั้งหมด (ยกเว้นปุ่มเลือกด่าน)
+                for button in self.stage.buttons:
+                    if not hasattr(button, 'is_level_button') or not button.is_level_button:
+                        button.set_visible(False)
+            else:
+                # ถ้าไม่ได้อยู่ในโหมด PLAYING ให้แสดงปุ่มทั้งหมด
+                for button in self.stage.buttons:
+                    button.set_visible(True)
+            
+            # อัปเดตปุ่มเลือกด่าน
             self.update_level_buttons()
             
-            # Reset game for the new level (resets camera, buttons, etc)
-            self.reset_game()
+            # คงสถานะเดิมไว้
+            self.game_state.change_state(current_state)
+            print(f"[GameManager] Maintained state as: {current_state}")
             
             return True
             
@@ -1160,214 +1192,6 @@ class GameManager:
             print(f"[GameManager] Error advancing to next level: {e}")
             # Continue without crashing
             return False
-    
-    def show_statistics(self):
-        """
-        Show statistics window with data visualization.
-        
-        Creates a Tkinter window with:
-        1. Heatmap of robot positions
-        2. Line graph of completion time vs attempts
-        3. Bar chart of recovery attempts by algorithm
-        4. Table of analyzed data
-        """
-        try:
-            print("[GameManager] Showing statistics window...")
-            
-            # Import necessary libraries
-            try:
-                import tkinter as tk
-                from tkinter import ttk
-                import matplotlib.pyplot as plt
-                from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-                import pandas as pd
-                import numpy as np
-                from matplotlib.figure import Figure
-            except ImportError as e:
-                print(f"Error importing required libraries: {e}")
-                print("Please make sure you have tkinter, matplotlib, and pandas installed.")
-                return
-            
-            # Create main window
-            root = tk.Tk()
-            root.title("Nav Card - Statistics")
-            root.geometry("1200x800")
-            
-            # Create a notebook (tabbed interface)
-            notebook = ttk.Notebook(root)
-            notebook.pack(fill='both', expand=True, padx=10, pady=10)
-            
-            # Prepare tabs
-            heatmap_tab = ttk.Frame(notebook)
-            line_graph_tab = ttk.Frame(notebook)
-            bar_chart_tab = ttk.Frame(notebook)
-            table_tab = ttk.Frame(notebook)
-            
-            notebook.add(heatmap_tab, text="Robot Positions Heatmap")
-            notebook.add(line_graph_tab, text="Time vs Attempts")
-            notebook.add(bar_chart_tab, text="Recovery Attempts")
-            notebook.add(table_tab, text="Analysis Table")
-            
-            # Generate data from the statistics module
-            heatmap_data = self.statistics.prepare_heatmap_data()
-            time_vs_attempts_data = self.statistics.prepare_time_vs_attempts_data()
-            recovery_data = self.statistics.prepare_recovery_by_algorithm_data()
-            table_data = self.statistics.prepare_user_summary_data()
-            
-            # 1. Create Heatmap Tab
-            if heatmap_data is not None and len(heatmap_data) > 0:
-                fig1 = Figure(figsize=(10, 6), dpi=100)
-                ax1 = fig1.add_subplot(111)
-                
-                # Create heatmap from data
-                if isinstance(heatmap_data, dict) and 'heatmap' in heatmap_data:
-                    heatmap_img = ax1.imshow(heatmap_data['heatmap'], cmap='hot', interpolation='nearest')
-                    ax1.set_title('Robot Position Heatmap')
-                    ax1.set_xlabel('X Position')
-                    ax1.set_ylabel('Y Position')
-                    
-                    # Add colorbar
-                    from mpl_toolkits.axes_grid1 import make_axes_locatable
-                    divider = make_axes_locatable(ax1)
-                    cax = divider.append_axes("right", size="5%", pad=0.1)
-                    fig1.colorbar(heatmap_img, cax=cax, orientation='vertical')
-                    
-                canvas1 = FigureCanvasTkAgg(fig1, heatmap_tab)
-                canvas1.draw()
-                canvas1.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                
-                # Add explanation label
-                explanation = "This heatmap shows where robots most frequently travel or get stuck. \nHotter (brighter) areas indicate higher frequency."
-                lbl_explain1 = tk.Label(heatmap_tab, text=explanation, justify="left", anchor="w")
-                lbl_explain1.pack(fill=tk.X, padx=10, pady=5)
-            else:
-                lbl_no_data1 = tk.Label(heatmap_tab, text="Not enough data to generate heatmap", font=("Arial", 14))
-                lbl_no_data1.pack(pady=50)
-            
-            # 2. Create Line Graph Tab
-            if time_vs_attempts_data is not None and len(time_vs_attempts_data) > 0:
-                fig2 = Figure(figsize=(10, 6), dpi=100)
-                ax2 = fig2.add_subplot(111)
-                
-                # Create line graph from data
-                if isinstance(time_vs_attempts_data, dict) and 'x' in time_vs_attempts_data and 'y' in time_vs_attempts_data:
-                    ax2.plot(time_vs_attempts_data['x'], time_vs_attempts_data['y'], 'o-', linewidth=2)
-                    ax2.set_title('Time to Completion vs. Attempt Number')
-                    ax2.set_xlabel('Attempt Number')
-                    ax2.set_ylabel('Time to Completion (seconds)')
-                    ax2.grid(True)
-                    
-                canvas2 = FigureCanvasTkAgg(fig2, line_graph_tab)
-                canvas2.draw()
-                canvas2.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                
-                # Add explanation label
-                explanation = "This graph shows how completion time changes with each attempt, \nillustrating player improvement over time."
-                lbl_explain2 = tk.Label(line_graph_tab, text=explanation, justify="left", anchor="w")
-                lbl_explain2.pack(fill=tk.X, padx=10, pady=5)
-            else:
-                lbl_no_data2 = tk.Label(line_graph_tab, text="Not enough data to generate line graph", font=("Arial", 14))
-                lbl_no_data2.pack(pady=50)
-            
-            # 3. Create Bar Chart Tab
-            if recovery_data is not None and len(recovery_data) > 0:
-                fig3 = Figure(figsize=(10, 6), dpi=100)
-                ax3 = fig3.add_subplot(111)
-                
-                # Create bar chart from data
-                if isinstance(recovery_data, dict) and 'algorithms' in recovery_data and 'attempts' in recovery_data:
-                    x_pos = np.arange(len(recovery_data['algorithms']))
-                    ax3.bar(x_pos, recovery_data['attempts'], align='center', alpha=0.7)
-                    ax3.set_xticks(x_pos)
-                    ax3.set_xticklabels(recovery_data['algorithms'], rotation=45, ha="right")
-                    ax3.set_title('Recovery Attempts by Algorithm Combination')
-                    ax3.set_xlabel('Algorithm Combinations')
-                    ax3.set_ylabel('Average Recovery Attempts')
-                    fig3.tight_layout()
-                    
-                canvas3 = FigureCanvasTkAgg(fig3, bar_chart_tab)
-                canvas3.draw()
-                canvas3.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-                
-                # Add explanation label
-                explanation = "This chart compares average recovery attempts across different algorithm combinations, \nhelping identify the most effective approaches."
-                lbl_explain3 = tk.Label(bar_chart_tab, text=explanation, justify="left", anchor="w")
-                lbl_explain3.pack(fill=tk.X, padx=10, pady=5)
-            else:
-                lbl_no_data3 = tk.Label(bar_chart_tab, text="Not enough data to generate bar chart", font=("Arial", 14))
-                lbl_no_data3.pack(pady=50)
-            
-            # 4. Create Table Tab
-            if table_data is not None and len(table_data) > 0:
-                # Create a frame for the table
-                table_frame = ttk.Frame(table_tab)
-                table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-                
-                # Create scrollbars
-                v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical")
-                h_scrollbar = ttk.Scrollbar(table_frame, orient="horizontal")
-                
-                # Create Treeview with scrollbars
-                tree = ttk.Treeview(table_frame, selectmode="extended", 
-                                    yscrollcommand=v_scrollbar.set,
-                                    xscrollcommand=h_scrollbar.set)
-                
-                v_scrollbar.config(command=tree.yview)
-                h_scrollbar.config(command=tree.xview)
-                
-                # Place scrollbars
-                v_scrollbar.pack(side="right", fill="y")
-                h_scrollbar.pack(side="bottom", fill="x")
-                tree.pack(side="left", fill="both", expand=True)
-                
-                # Assuming table_data is a pandas DataFrame or has a similar structure
-                if hasattr(table_data, 'columns'):
-                    # Configure columns
-                    tree["columns"] = list(table_data.columns)
-                    tree["show"] = "headings"
-                    
-                    # Set column headings
-                    for column in tree["columns"]:
-                        tree.heading(column, text=column)
-                        tree.column(column, width=100, anchor="center")
-                    
-                    # Insert data
-                    for i, row in table_data.iterrows():
-                        tree.insert("", "end", values=list(row))
-                else:
-                    # Handle if table_data is in another format (e.g., list of dictionaries)
-                    # Example for list of dictionaries:
-                    if isinstance(table_data, list) and len(table_data) > 0 and isinstance(table_data[0], dict):
-                        # Get column names from first row
-                        columns = list(table_data[0].keys())
-                        
-                        # Configure columns
-                        tree["columns"] = columns
-                        tree["show"] = "headings"
-                        
-                        # Set column headings
-                        for column in columns:
-                            tree.heading(column, text=column)
-                            tree.column(column, width=100, anchor="center")
-                        
-                        # Insert data
-                        for item in table_data:
-                            tree.insert("", "end", values=[item.get(col, "") for col in columns])
-                
-                # Add explanation label
-                explanation = "This table shows analyzed game data across all users, highlighting key performance metrics."
-                lbl_explain4 = tk.Label(table_tab, text=explanation, justify="left", anchor="w")
-                lbl_explain4.pack(fill=tk.X, padx=10, pady=5)
-            else:
-                lbl_no_data4 = tk.Label(table_tab, text="Not enough data to generate table", font=("Arial", 14))
-                lbl_no_data4.pack(pady=50)
-            
-            # Run the Tkinter event loop
-            root.mainloop()
-            
-        except Exception as e:
-            print(f"Error showing statistics window: {e}")
-            # Continue without crashing
     
     def run(self):
         """Run the main game loop."""

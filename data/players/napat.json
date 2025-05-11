@@ -1,13 +1,19 @@
 {
     "username": "napat",
-    "current_level": 3,
-    "highest_completed_level": 2,
+    "current_level": 10,
+    "highest_completed_level": 11,
     "unlocked_cards": {
         "Navigation": [
             "DFS",
-            "BFS"
+            "BFS",
+            "Dijkstra",
+            "AStar",
+            "RRT"
         ],
-        "Collision avoidance": [],
+        "Collision avoidance": [
+            "VFH",
+            "Bug"
+        ],
         "Recovery": [
             "SpinInPlace",
             "StepBack"

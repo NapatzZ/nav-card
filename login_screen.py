@@ -218,8 +218,13 @@ class LoginScreen:
             if self.player_data.player_exists(self.username):
                 self.player_data.load_player_data(self.username)
                 print(f"[LoginScreen] Welcome back, {self.username}!")
+                
+                # ต้องมีการอัปเดตการ์ดที่ปลดล็อกแล้วในเด็คการ์ด แต่ยังไม่สามารถเข้าถึง card_deck ได้โดยตรงจากที่นี่
+                # จึงต้องตั้งค่าแฟล็กเพื่อให้ GameManager รู้ว่าต้องอัปเดตการ์ด
+                self.is_returning_player = True  # ใช้แฟล็กนี้เพื่อบอกว่าต้องอัปเดตการ์ด
             else:
                 print(f"[LoginScreen] New player: {self.username}")
+                self.is_returning_player = False
                 
             return True
         return False
