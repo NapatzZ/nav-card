@@ -1,0 +1,12 @@
+{
+    "username": "ant",
+    "current_level": 1,
+    "highest_completed_level": 1,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS"
+        ],
+        "Collision avoidance": [],
+        "Recovery": []
+    }
+}

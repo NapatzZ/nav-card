@@ -87,42 +87,62 @@ class CardDeck:
                 print(f"[CardDeck] Added {card_type} card: {card_name}")
     
     def update_available_cards(self):
-        """อัพเดตการ์ดที่มีให้ตรงกับการ์ดที่ปลดล็อกแล้ว"""
-        # ดึงข้อมูลการ์ดที่ปลดล็อกแล้วจาก GameState
+        """Update available cards to match unlocked cards from game state"""
+        print("[CardDeck] Updating available cards...")
+        
+        # Get current unlocked cards from GameState
         unlocked_cards = self.__game_state.get_unlocked_cards()
         
-        # เก็บการ์ดที่วางไว้บนสล็อตแล้ว
+        # Keep track of cards already placed on slots
         placed_cards = {area: card for area, card in self.__placed_cards.items() if card is not None}
+        print(f"[CardDeck] Found {len(placed_cards)} cards already placed on slots")
         
-        # ล้างการ์ดทั้งหมด
+        # Clear all current cards
+        old_cards = len(self.__cards)
         self.__cards = []
         
-        # สร้างการ์ดตามที่ปลดล็อกแล้ว
+        # Create cards according to unlocked cards
+        total_new_cards = 0
         for card_type, card_names in unlocked_cards.items():
             for card_name in card_names:
-                # ตรวจสอบว่าการ์ดนี้วางอยู่บนสล็อตหรือไม่
+                # Check if this card is already placed on a slot
                 is_placed = False
                 for area, placed_card in placed_cards.items():
                     if placed_card.card_type == card_type and placed_card.card_name == card_name:
-                        # เพิ่มการ์ดที่วางไว้แล้วกลับเข้าไป
+                        # Re-add the card that's already placed
                         self.__cards.append(placed_card)
                         is_placed = True
+                        print(f"[CardDeck] Re-added placed card: {card_type} - {card_name} in {area}")
                         break
                 
-                # ถ้าการ์ดนี้ยังไม่ได้วาง ให้สร้างใหม่
+                # If card is not placed yet, create a new one
                 if not is_placed:
                     card = Card(card_type, card_name)
                     card.current_area = "deck"
                     self.__cards.append(card)
+                    total_new_cards += 1
+                    print(f"[CardDeck] Added new card: {card_type} - {card_name}")
         
-        # อัพเดต placed_cards ให้ชี้ไปที่การ์ดใหม่
+        print(f"[CardDeck] Updated card deck from {old_cards} to {len(self.__cards)} cards (new: {total_new_cards})")
+        
+        # Update placed_cards to point to new card objects
+        updated_placements = 0
         for area, old_card in placed_cards.items():
             for card in self.__cards:
                 if (card.card_type == old_card.card_type and 
                     card.card_name == old_card.card_name and
                     card.current_area == old_card.current_area):
                     self.__placed_cards[area] = card
+                    updated_placements += 1
                     break
+        
+        print(f"[CardDeck] Updated {updated_placements} card placements")
+        
+        # Force close preview mode to ensure proper state
+        self.__preview_mode = False
+        self.__deck_visible = False
+        for card in self.__cards:
+            card.exit_preview_mode()
     
     def handle_events(self, events):
         """Handle game events related to cards.

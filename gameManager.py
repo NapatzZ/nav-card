@@ -216,6 +216,34 @@ class GameManager:
                             # When in FINISH mode and Space is pressed, start a new game
                             print("[GameManager] Spacebar pressed in FINISH mode, returning to CARD_CHOOSING mode")
                             
+                            # Store current state for later use
+                            was_successful = self.statistics.completion_success
+                            current_level = self.game_state.get_current_level()
+                            print(f"[GameManager] Level {current_level} completion: {was_successful}")
+                            
+                            # If successful, check if we can advance to next level and should show new cards
+                            if was_successful and self.game_state.can_advance_to_level(current_level + 1):
+                                # Check for cards that would be unlocked at the next level
+                                next_level = current_level + 1
+                                if next_level <= 11:  # Ensure we don't go beyond max level
+                                    potential_unlocks = self.game_state.level_unlocks.get(next_level, [])
+                                    if potential_unlocks:
+                                        print(f"[GameManager] Showing new cards unlock dialog for level {next_level}")
+                                        # Create the notification for new cards
+                                        newly_unlocked = []
+                                        for card_info in potential_unlocks:
+                                            card_type = card_info["type"]
+                                            card_name = card_info["name"]
+                                            # Only add if not already unlocked
+                                            if card_name not in self.game_state.unlocked_cards[card_type]:
+                                                newly_unlocked.append({"type": card_type, "name": card_name})
+                                        
+                                        if newly_unlocked:
+                                            self.new_cards = newly_unlocked
+                                            self.new_cards_notification = True
+                                            self.notification_start_time = time.time()
+                                            print(f"[GameManager] Unlocked {len(newly_unlocked)} new cards")
+                            
                             # Clear path and reset state
                             self.costmap.reset()
                             
@@ -235,18 +263,7 @@ class GameManager:
                                 
                             # Update level buttons to ensure next level is available if completed
                             self.update_level_buttons()
-                            
-                            # Print debug information
-                            print(f"[GameManager] Current level: {self.game_state.get_current_level()}, Highest completed: {self.game_state.highest_completed_level}")
-                            print(f"[GameManager] Completion success status: {self.statistics.completion_success}")
-                                
-                            # If level was completed successfully, ensure next level button is active
-                            if self.statistics.completion_success:
-                                for button in self.stage.buttons:
-                                    if button.action_name == "next_level_valid":
-                                        button.set_visible(True)
-                                    elif button.action_name == "next_level_invalid":
-                                        button.set_visible(False)
+                            print(f"[GameManager] Buttons updated. Current level: {self.game_state.get_current_level()}, Highest completed: {self.game_state.highest_completed_level}")
                     # เพิ่มปุ่ม N สำหรับเลื่อนไปด่านถัดไป (สำหรับการทดสอบ)
                     elif event.key == pygame.K_n:
                         self.advance_to_next_level()
@@ -580,17 +597,28 @@ class GameManager:
                 print(f"[GameManager] Setting completion_success to: {success}")
                 self.statistics.save_all_data()
             
-            # Mark level as completed if successful
+            # Mark level as completed if successful and change state to FINISH
             if success:
                 # Record that player has completed this level
                 completed = self.game_state.complete_current_level()
                 print(f"[GameManager] Level completion status updated: {completed}")
                 
+                # Check if there are new cards to unlock for the next level
+                next_level = self.game_state.get_current_level() + 1
+                if next_level <= 11:  # Ensure we're not beyond the last level
+                    potential_unlocks = self.game_state.level_unlocks.get(next_level, [])
+                    if potential_unlocks:
+                        print(f"[GameManager] Potential cards to unlock at level {next_level}: {len(potential_unlocks)}")
+                
                 # Save player data
                 self.player_data.save_player_data(self.game_state.get_username())
-                
-                # Update level buttons to show next level as available
-                self.update_level_buttons()
+            
+            # Change to FINISH state after processing completion
+            self.game_state.change_state(GameStateEnum.FINISH.value)
+            print(f"[GameManager] State changed to FINISH. Success: {success}")
+            
+            # Update level buttons to reflect new state
+            self.update_level_buttons()
             
         except Exception as e:
             print(f"Error in algorithm complete callback: {e}")
@@ -600,12 +628,12 @@ class GameManager:
     def update(self):
         """Update the game state."""
         try:
-            # ถ้าอยู่ในหน้าล็อกอิน ให้อัพเดตหน้าล็อกอินเท่านั้น
+            # If in login screen, update login screen only
             if self.game_state.get_state() == GameStateEnum.LOGIN.value:
                 self.login_screen.update()
                 return
                 
-            # ถ้าอยู่ในโหมด PAUSE ไม่ต้องอัปเดตอะไร
+            # If in PAUSE mode, don't update anything
             if self.game_state.get_state() == GameStateEnum.PAUSE.value:
                 return
                 
@@ -618,11 +646,13 @@ class GameManager:
                     self.camera_y = self.target_camera_y
                     self.camera_animating = False
                     
-                    # ตรวจสอบตำแหน่งกล้องเพื่อกำหนดสถานะเกม
+                    # Set game state based on camera position
                     if self.camera_y > 0 and self.game_state.get_state() == GameStateEnum.CARD_CHOOSING.value:
                         self.game_state.change_state(GameStateEnum.PLAYING.value)
+                        print("[GameManager] State changed to PLAYING")
                     elif self.camera_y <= 0 and self.game_state.get_state() == GameStateEnum.PLAYING.value:
                         self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
+                        print("[GameManager] State changed to CARD_CHOOSING")
             
             # Check if algorithm should auto-start
             if self.should_auto_start and time.time() - self.algorithm_start_time >= self.auto_start_delay:
@@ -635,64 +665,62 @@ class GameManager:
             # Update cards
             self.card_deck.update()
             
-            # ตรวจสอบว่าหุ่นยนต์ถึงเป้าหมายหรือไม่ (เมื่ออยู่ในโหมด PLAYING)
+            # Check if robot has reached the goal (when in PLAYING mode)
             if self.game_state.get_state() == GameStateEnum.PLAYING.value and hasattr(self, 'current_algorithm') and self.current_algorithm:
-                # ตรวจสอบตำแหน่งหุ่นยนต์และเป้าหมาย
+                # Check robot and goal positions
                 if self.costmap.robot_pos and self.costmap.goal_pos:
                     robot_row, robot_col = self.costmap.robot_pos
                     goal_row, goal_col = self.costmap.goal_pos
                     
-                    # ถ้าหุ่นยนต์อยู่ที่เป้าหมาย หรืออยู่ห่างจากเป้าหมายไม่เกิน 1 ช่อง ให้ถือว่าถึงเป้าหมายแล้ว
+                    # If robot is at goal or within 1 cell, consider goal reached
                     distance = abs(robot_row - goal_row) + abs(robot_col - goal_col)
-                    if distance <= 1:  # Manhattan distance <= 1 (อยู่ติดกัน)
+                    if distance <= 1:  # Manhattan distance <= 1 (adjacent)
                         print(f"[GameManager] Robot reached goal! Distance: {distance}")
                         
-                        # กำหนดว่าอัลกอริทึมสำเร็จ
+                        # Mark algorithm as completed
                         self.current_algorithm.is_completed = True
                         
-                        # สร้างเส้นทางถ้ายังไม่มี
+                        # Create path if none exists
                         if not hasattr(self.current_algorithm, 'path') or not self.current_algorithm.path:
                             self.current_algorithm.path = [(robot_row, robot_col)]
                         
-                        # เรียกใช้ callback เมื่ออัลกอริทึมทำงานเสร็จสิ้น (สำเร็จ)
+                        # Call callback when algorithm completes (success)
                         self.on_algorithm_complete(True, len(self.current_algorithm.path))
                         
-                        # เปลี่ยนสถานะเกมเป็น FINISH
-                        self.game_state.change_state(GameStateEnum.FINISH.value)
-                        
-                        # เคลียร์อินสแตนซ์ของอัลกอริทึม
+                        # Clear algorithm instance
                         self.current_algorithm = None
                         
-                        return  # หยุดการอัพเดตเมื่อถึงเป้าหมายแล้ว
+                        return  # Stop updating after reaching goal
             
-            # ตรวจสอบเวลาหมดเมื่ออยู่ในโหมด PLAYING
+            # Check time limit when in PLAYING mode
             if self.game_state.get_state() == GameStateEnum.PLAYING.value and self.statistics.is_timing:
                 elapsed_time = self.statistics.get_elapsed_time()
                 time_limit = self.statistics.get_time_limit()
                 
-                # ถ้าเวลาเกินกำหนด ให้หยุดเกมและแสดงผลว่าล้มเหลว
+                # If time exceeds limit, stop game and show failure
                 if elapsed_time > time_limit:
                     print(f"[GameManager] Time limit exceeded: {elapsed_time:.2f}/{time_limit} seconds")
                     
-                    # หยุดอัลกอริทึมที่กำลังทำงาน
+                    # Stop running algorithm
                     if hasattr(self, 'current_algorithm') and self.current_algorithm:
                         self.current_algorithm.stop()
                         self.current_algorithm.is_completed = False
                         
-                    # เรียกใช้ callback เมื่ออัลกอริทึมทำงานเสร็จสิ้น (ล้มเหลว)
+                    # Call callback when algorithm completes (failure)
                     self.on_algorithm_complete(False, 0)
                     
-                    # เปลี่ยนสถานะเกมเป็น FINISH
-                    self.game_state.change_state(GameStateEnum.FINISH.value)
+                    # Clear algorithm instance
+                    self.current_algorithm = None
             
-            # อัพเดตสถานะของปุ่มเปลี่ยนด่าน
-            self.update_level_buttons()
+            # Update level buttons status
+            if self.game_state.get_state() == GameStateEnum.CARD_CHOOSING.value:
+                self.update_level_buttons()
                 
             # Update algorithm if running
             if hasattr(self, 'current_algorithm') and self.current_algorithm:
                 still_running = self.current_algorithm.update()
                 
-                # บันทึกตำแหน่งหุ่นยนต์ถ้ามีการเคลื่อนที่
+                # Record robot position if moved
                 if self.costmap.robot_pos:
                     self.statistics.add_robot_position(
                         self.costmap.robot_pos[0], 
@@ -700,30 +728,21 @@ class GameManager:
                     )
                 
                 if not still_running:
-                    print("Algorithm completed or stopped.")
+                    print("[GameManager] Algorithm completed or stopped.")
                     
-                    # เรียกใช้ callback เมื่ออัลกอริทึมทำงานเสร็จสิ้น
+                    # Call callback when algorithm completes
                     success = self.current_algorithm.is_completed
                     path_length = len(self.current_algorithm.path) if hasattr(self.current_algorithm, 'path') else 0
                     self.on_algorithm_complete(success, path_length)
                     
+                    # Clear algorithm instance
                     self.current_algorithm = None
                     
-                    # เมื่ออัลกอริทึมทำงานเสร็จ ให้บันทึกว่าด่านปัจจุบันผ่านแล้ว
+                    # Show message if successful
                     if success:
-                        self.game_state.complete_current_level()
-                        
-                    # เปลี่ยนสถานะเกมเป็น FINISH
-                    self.game_state.change_state(GameStateEnum.FINISH.value)
+                        print(f"[GameManager] Completed level {self.game_state.get_current_level()}!")
                     
-                    # แสดงปุ่มสำหรับไปด่านถัดไป
-                    self.update_level_buttons()
-                    
-                    # แสดงข้อความว่าผ่านด่านแล้ว
-                    if success:
-                        print(f"Completed level {self.game_state.get_current_level()}!")
-                    
-            # อัพเดตการแสดงการ์ดที่ปลดล็อกใหม่
+            # Update card unlock notification display
             if self.new_cards_notification:
                 if time.time() - self.notification_start_time >= self.notification_duration:
                     self.new_cards_notification = False
@@ -1021,44 +1040,53 @@ class GameManager:
             
             # Check if player can advance to next level
             if not self.game_state.can_advance_to_level(current_level + 1):
-                print(f"Cannot advance to level {current_level + 1} yet. Complete level {current_level} first.")
+                print(f"[GameManager] Cannot advance to level {current_level + 1} yet. Complete level {current_level} first.")
                 return
             
-            # Mark current level as completed
-            self.game_state.complete_current_level()
-                
+            # Mark current level as completed (in case it wasn't already)
+            completed = self.game_state.complete_current_level()
+            print(f"[GameManager] Marking level {current_level} as completed: {completed}")
+            
             # Advance to next level
+            next_level = current_level + 1
+            
+            # Check if there are cards to unlock at this level
+            potential_unlocks = self.game_state.level_unlocks.get(next_level, [])
+            
+            # Actually advance the level
             newly_unlocked = self.game_state.advance_level()
+            print(f"[GameManager] Advanced to level {next_level}, unlocked {len(newly_unlocked)} new cards")
             
             # Load map for new level
             self.load_current_level_map()
+            print(f"[GameManager] Loaded map for level {self.game_state.get_current_level()}")
             
-            # Show new level info
-            current_level = self.game_state.get_current_level()
-            print(f"Advanced to level {current_level}")
-            
-            # If new cards were unlocked, show notification
+            # If cards were unlocked, show notification
             if newly_unlocked:
                 self.new_cards = newly_unlocked
                 self.new_cards_notification = True
                 self.notification_start_time = time.time()
                 
                 # Show unlocked card info
-                print("Unlocked new cards:")
+                print("[GameManager] Unlocked new cards:")
                 for card_info in newly_unlocked:
-                    print(f"- {card_info['type']}: {card_info['name']}")
+                    print(f"  - {card_info['type']}: {card_info['name']}")
                     
                 # Update available cards in game
                 self.card_deck.update_available_cards()
+                print("[GameManager] Updated available cards in deck")
                 
             # Save player data after advancing level
             self.player_data.save_player_data(self.game_state.get_username())
             
-            # Reset game after advancing level
+            # Update level buttons to reflect the new level
+            self.update_level_buttons()
+            
+            # Reset game for the new level
             self.reset_game()
             
         except Exception as e:
-            print(f"Error advancing to next level: {e}")
+            print(f"[GameManager] Error advancing to next level: {e}")
             # Continue without crashing
     
     def run(self):

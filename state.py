@@ -89,28 +89,41 @@ class GameState:
         Returns:
             list: List of newly unlocked cards
         """
+        print(f"[GameState] Advancing from level {self.current_level}")
+        
         # Record that current level is completed
         if self.current_level > self.highest_completed_level:
             self.highest_completed_level = self.current_level
+            print(f"[GameState] Updated highest completed level to {self.highest_completed_level}")
         
         # Increase level
         self.current_level += 1
         if self.current_level > 11:
             self.current_level = 11  # Limit to 11 levels
+            print(f"[GameState] Reached maximum level (11)")
             return []
+            
+        print(f"[GameState] Now at level {self.current_level}")
             
         # Unlock new cards only when passing this level for the first time
         newly_unlocked = []
-        if self.current_level <= self.highest_completed_level + 1:
-            for card_info in self.level_unlocks.get(self.current_level, []):
-                card_type = card_info["type"]
-                card_name = card_info["name"]
+        
+        # Get cards to unlock for this level
+        cards_to_unlock = self.level_unlocks.get(self.current_level, [])
+        print(f"[GameState] Found {len(cards_to_unlock)} potential cards to unlock for level {self.current_level}")
+            
+        # Process each card in the level unlock list
+        for card_info in cards_to_unlock:
+            card_type = card_info["type"]
+            card_name = card_info["name"]
+            
+            # Add newly unlocked card if not already unlocked
+            if card_name not in self.unlocked_cards[card_type]:
+                self.unlocked_cards[card_type].append(card_name)
+                newly_unlocked.append({"type": card_type, "name": card_name})
+                print(f"[GameState] Unlocked new card: {card_type} - {card_name}")
                 
-                # Add newly unlocked card
-                if card_name not in self.unlocked_cards[card_type]:
-                    self.unlocked_cards[card_type].append(card_name)
-                    newly_unlocked.append({"type": card_type, "name": card_name})
-                
+        print(f"[GameState] Unlocked {len(newly_unlocked)} new cards")
         return newly_unlocked
         
     def get_unlocked_cards(self):
