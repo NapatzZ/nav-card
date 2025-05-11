@@ -13,3 +13,7 @@ Navigate,1,DFS,1,13.604
 Navigate,2,BFS,1,11.383
 Navigate,3,DFS,1,10.012
 Navigate,3,BFS,1,10.005
+som,1,,1,0.0
+som,1,DFS,1,13.639
+som,2,BFS,1,11.392
+som,3,DFS,1,10.01
