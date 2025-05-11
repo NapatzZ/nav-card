@@ -1,3 +1,5 @@
 username,level,algorithm,attempt,time_seconds
 jadi,1,DFS,1,43.889
 Ulike,1,DFS,1,43.86
+joshWbush,1,DFS,1,10.203
+kendo,1,DFS,1,10.157

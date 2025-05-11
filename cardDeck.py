@@ -615,7 +615,7 @@ class CardDeck:
         window_width, window_height = Config.get_window_dimensions()
         
         # Use constant value as actual position, no calculation from screen size
-        center_x = window_width // 2  # ตำแหน่งตรงกลางจอ
+        center_x = 600  # เปลี่ยนเป็น 600 ซึ่งเป็นครึ่งหนึ่งของ BOARD_WIDTH (1200)
         
         # Set display area height - slightly below screen center
         center_y = int(window_height * 0.6)
