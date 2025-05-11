@@ -326,13 +326,27 @@ class CardDeck:
                 # Store current position before calling stop_dragging
                 current_position = card.position
                 
+                # Get old card area before placement attempt
+                old_area = card.current_area
+                
                 # Try to place card on stage - pass (0, 0) as camera offset since events are already adjusted
                 if self.__check_card_placement(card, current_position):
                     # Stop dragging without resetting position (card will be in placed area)
                     card.stop_dragging(reset_position=False)
+                    print(f"[Card Placement] Card placed successfully in area: {card.current_area}")
                 else:
                     # Stop dragging and reset position (card will go back to original)
                     card.stop_dragging(reset_position=True)
+                    
+                    # ส่งการ์ดกลับไปยัง deck เมื่อวางในพื้นที่ที่ไม่ถูกต้อง
+                    card.current_area = "deck"
+                    print(f"[Card Placement] Card returned to deck due to invalid placement")
+                    
+                    # ถ้าการ์ดเคยอยู่ในพื้นที่เล่นการ์ดก่อนหน้านี้ ให้ลบออกจาก placed_cards
+                    if old_area in ["Navigation", "Collision avoidance", "Recovery"]:
+                        if self.__placed_cards.get(old_area) == card:
+                            self.__placed_cards.pop(old_area, None)
+                            print(f"[Card Placement] Removed card from {old_area} slot")
                 
                 # Return hovering
                 card.hovering_area = None
