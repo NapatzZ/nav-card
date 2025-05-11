@@ -352,8 +352,18 @@ class GameManager:
                 self.go_to_previous_level()
             
             elif action == "stat":
-                # Handle stat button click (for now, just pass)
-                pass
+                # Open statistics visualization
+                from statistics.visualization.visualization import open_visualization
+                # Save statistics data before displaying
+                self.statistics.save_all_data()
+                print("[GameManager] Statistics data saved, opening visualization window...")
+                # Store current game state to restore it after visualization
+                current_state = self.game_state.get_state()
+                # Open visualization window
+                open_visualization(self.window_width, self.window_height)
+                # Ensure game state is restored after visualization
+                self.game_state.change_state(current_state)
+                print("[GameManager] Returned from visualization, continuing game...")
             
             # After handling button action, update button visibility
             self.update_level_buttons()
@@ -452,7 +462,9 @@ class GameManager:
                         self.costmap.set_goal_position(finish_row, finish_col)
                         
                         # Set time limit for this level
-                        time_limit = int(level_data['time_limit'])
+                        time_limit_str = level_data['time_limit']
+                        time_limit_value = ''.join(c for c in time_limit_str if c.isdigit())
+                        time_limit = int(time_limit_value)
                         self.statistics.set_time_limit(time_limit)
                         
                         print(f"[GameManager] Applied level {current_level} settings from levels.csv:")
@@ -1487,7 +1499,9 @@ class GameManager:
                     print(f"[GameManager] Goal reset to correct position: {correct_goal_pos}")
                 
                 # ตรวจสอบว่าค่า time_limit ถูกต้องหรือไม่
-                time_limit = int(level_data['time_limit'])
+                time_limit_str = level_data['time_limit']
+                time_limit_value = ''.join(c for c in time_limit_str if c.isdigit())
+                time_limit = int(time_limit_value)
                 if self.statistics.time_limit != time_limit:
                     print(f"[GameManager] Incorrect time limit detected: {self.statistics.time_limit}, should be {time_limit}")
                     # แก้ไขค่า time_limit ให้ถูกต้อง
@@ -1543,7 +1557,9 @@ class GameManager:
             
             # If we have data from levels.csv, set time limit
             if level_data:
-                time_limit = int(level_data['time_limit'])
+                time_limit_str = level_data['time_limit']
+                time_limit_value = ''.join(c for c in time_limit_str if c.isdigit())
+                time_limit = int(time_limit_value)
                 if self.statistics.time_limit != time_limit:
                     print(f"[GameManager] Incorrect time limit detected: {self.statistics.time_limit}, should be {time_limit}")
                     # Update time limit
@@ -1584,7 +1600,11 @@ class GameManager:
             
             # If we have data from levels.csv, return time limit
             if level_data:
-                return int(level_data['time_limit'])
+                # ตรวจสอบและแปลงค่า time_limit ที่มีหน่วยเวลาต่อท้าย
+                time_limit_str = level_data['time_limit']
+                # ตัดตัวอักษรออกจากตัวเลข (เช่น '10s' เป็น '10')
+                time_limit_value = ''.join(c for c in time_limit_str if c.isdigit())
+                return int(time_limit_value)
             else:
                 print(f"[GameManager] Warning: No data found for level {current_level} in levels.csv")
                 return None

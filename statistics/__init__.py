@@ -1,0 +1,3 @@
+"""
+Statistics package initialization.
+""" 
