@@ -1,0 +1,20 @@
+{
+    "username": "mr.j",
+    "current_level": 6,
+    "highest_completed_level": 6,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS",
+            "Dijkstra",
+            "AStar"
+        ],
+        "Collision avoidance": [
+            "VFH"
+        ],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}

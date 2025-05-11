@@ -1,0 +1,3 @@
+timestamp,username,level,attempt,algorithm_name,algorithm_type,time_seconds,time_formatted,success,stuck_count,recovery_attempts
+2025-05-11 18:52:38,mr.j,1,1,DFS,Navigation,47.3,00:47.300,1,0,0
+2025-05-11 18:53:09,mr.j,2,1,BFS,Navigation,11.374,00:11.373,1,0,0

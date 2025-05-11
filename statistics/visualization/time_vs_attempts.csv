@@ -1,0 +1,3 @@
+username,level,algorithm,attempt,time_seconds
+mr.j,1,DFS,1,47.3
+mr.j,2,BFS,1,11.374
