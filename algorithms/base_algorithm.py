@@ -58,7 +58,12 @@ class BaseAlgorithm:
             return False
             
         if not self.path:
-            self.is_completed = True
+            # ตรวจสอบว่ามี path หรือไม่ ถ้าไม่มีแสดงว่าการวางแผนล้มเหลว
+            # ไม่ควรถือว่า completed เพราะอาจต้องพยายามหาเส้นทางอีกครั้ง
+            # แต่ยังถือว่าไม่สำเร็จในการทำงานปัจจุบัน
+            print(f"[BaseAlgorithm] No path available. Path planning may have failed.")
+            self.is_completed = False
+            self.is_running = False
             return False
         
         # ตรวจสอบว่าถึงเวลาที่จะทำสเต็ปต่อไปหรือไม่
@@ -77,9 +82,13 @@ class BaseAlgorithm:
             
             # Check if we've reached the goal
             if self.robot_pos and self.goal_pos:
-                distance = abs(self.robot_pos[0] - self.goal_pos[0]) + abs(self.robot_pos[1] - self.goal_pos[1])
-                if distance <= 1:  # ถ้าอยู่ในระยะห่างไม่เกิน 1 ช่อง ถือว่าถึงเป้าหมายแล้ว
-                    print(f"[BaseAlgorithm] Goal reached! Distance: {distance}")
+                # คำนวณระยะห่างทั้งแบบ Manhattan และ Euclidean
+                manhattan_dist = abs(self.robot_pos[0] - self.goal_pos[0]) + abs(self.robot_pos[1] - self.goal_pos[1])
+                euclidean_dist = ((self.robot_pos[0] - self.goal_pos[0])**2 + (self.robot_pos[1] - self.goal_pos[1])**2)**0.5
+                
+                # ใช้เกณฑ์ที่เข้มงวดกว่าเดิม - ต้องใกล้เป้าหมายจริงๆ
+                if manhattan_dist <= 1 and euclidean_dist <= 1.0:
+                    print(f"[BaseAlgorithm] Goal reached! Manhattan distance: {manhattan_dist}, Euclidean distance: {euclidean_dist:.2f}")
                     # Set final position to exactly the goal position for visual clarity
                     self.costmap.set_robot_position(*self.goal_pos)
                     self.robot_pos = self.goal_pos
@@ -88,10 +97,23 @@ class BaseAlgorithm:
                     print(f"{self.__class__.__name__}: Path completed - Goal reached")
                     return False
         else:
-            # Reached the end of the path
-            self.is_completed = True
-            self.is_running = False
-            print(f"{self.__class__.__name__}: Path completed")
+            # ตรวจสอบว่าถึงเป้าหมายแล้วจริงๆ ก่อนจะถือว่าเสร็จสิ้น
+            if self.robot_pos and self.goal_pos:
+                manhattan_dist = abs(self.robot_pos[0] - self.goal_pos[0]) + abs(self.robot_pos[1] - self.goal_pos[1])
+                if manhattan_dist <= 1:
+                    self.is_completed = True
+                    self.is_running = False
+                    print(f"{self.__class__.__name__}: Path completed - Goal reached")
+                else:
+                    # ถ้ายังห่างจากเป้าหมายอยู่ ให้ถือว่ายังไม่สำเร็จ แม้ว่าจะสิ้นสุดเส้นทางแล้ว
+                    print(f"{self.__class__.__name__}: Path completed but goal not reached! Distance: {manhattan_dist}")
+                    self.is_completed = False
+                    self.is_running = False
+            else:
+                # ถ้าไม่มีตำแหน่งเป้าหมายหรือหุ่นยนต์ ให้ถือว่าเสร็จสิ้นแต่ไม่สำเร็จ
+                self.is_completed = False
+                self.is_running = False
+                print(f"{self.__class__.__name__}: Path completed but no robot/goal position")
             
         return self.is_running
         

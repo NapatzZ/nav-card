@@ -466,28 +466,54 @@ class GameManager:
             # Change game state to CARD_CHOOSING
             self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
             
-            # Reset all cards back to the deck
-            self.card_deck.reset_cards()
-            print("[GameManager] All cards have been reset to deck")
+            # Reset all cards back to the deck using CardDeck's reset method
+            self.card_deck.reset_cards()  # ใช้ reset_cards แทน reset เพื่อจัดการกับการ drag
             
-            # Set state to card selection mode (not gameplay mode)
+            # Set state to card selection mode (ไม่ใช่โหมดเกมเพลย์)
             self.card_deck.set_game_stage(False)
             
-            # Show all buttons again, including start and reset buttons
-            print("Showing all buttons including start and reset")
-            for button in self.stage.buttons:
-                button.set_visible(True)
+            # เพิ่มการตรวจสอบว่าการ์ดถูกรีเซ็ตเรียบร้อยแล้ว
+            print("[GameManager] Verifying all cards reset to deck...")
+            all_slots_empty = True
+            for slot in self.stage.slots:
+                if slot.card is not None:
+                    all_slots_empty = False
+                    print(f"[GameManager] WARNING: Slot {slot.card_type.value} still has card: {slot.card.card_name}")
+                    # บังคับให้ slot.card เป็น None
+                    slot.card = None
             
-            # Stop any running algorithm
+            if all_slots_empty:
+                print("[GameManager] All slots are empty after reset")
+                
+            # หยุดและล้างอัลกอริทึมปัจจุบัน
             if hasattr(self, 'current_algorithm') and self.current_algorithm:
                 self.current_algorithm.stop()
                 self.current_algorithm = None
+                print("[GameManager] Current algorithm stopped and cleared")
                 
-            # Close new cards notification
+            # แสดงปุ่มทั้งหมด
+            self.show_all_buttons()
+            
+            # ปิดการแจ้งเตือนการ์ดใหม่
             self.new_cards_notification = False
+            
         except Exception as e:
             print(f"Error resetting game: {e}")
-            # Continue without crashing
+            import traceback
+            traceback.print_exc()
+            
+        finally:
+            # ตรวจสอบอีกครั้งว่า current_algorithm เป็น None
+            self.current_algorithm = None
+            
+    def show_all_buttons(self):
+        """Show all buttons in the game, including start and reset buttons."""
+        print("[GameManager] Showing all buttons")
+        for button in self.stage.buttons:
+            button.set_visible(True)
+            
+        # ตรวจสอบและอัปเดตปุ่มเปลี่ยนระดับ
+        self.update_level_buttons()
     
     def start_game(self):
         """
@@ -508,6 +534,9 @@ class GameManager:
             # Set state to gameplay mode
             self.card_deck.set_game_stage(True)
             
+            # ตรวจสอบและรีเซ็ตตำแหน่งหุ่นยนต์ถ้าไม่ได้อยู่ที่จุดเริ่มต้น
+            self.__check_and_reset_robot_position()
+            
             # Set camera target position to move down half the screen (use positive value)
             self.target_camera_y = self.window_height / 1.8
             self.camera_animating = True
@@ -520,7 +549,7 @@ class GameManager:
                     # ปุ่มเปลี่ยนแมพยังคงแสดงในโหมด PLAYING
                     button.set_visible(True)
             
-            # ถ้าไม่มีการ์ดวางอยู่ในช่อง ให้ข้ามการตั้งเวลาเริ่มอัลกอริทึม
+            # ตรวจสอบว่ามีการวางการ์ดในช่องหรือไม่
             has_cards = False
             for slot in self.stage.slots:
                 if slot.card:
@@ -542,6 +571,13 @@ class GameManager:
             else:
                 # ไม่มีการ์ดวางอยู่ ข้ามการเริ่มอัลกอริทึมอัตโนมัติ
                 self.should_auto_start = False
+                
+                # รีเซ็ตอัลกอริทึมเป็น None
+                if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                    self.current_algorithm.stop()
+                self.current_algorithm = None
+                print("[GameManager] Reset algorithm to None due to no cards placed")
+                
                 print("--------------------------------------------")
                 print("No cards placed. Auto-start skipped. Viewing map only.")
                 print("--------------------------------------------")
@@ -555,35 +591,60 @@ class GameManager:
         try:
             print("[GameManager] Running algorithm...")
             
-            # ตรวจสอบก่อนว่ามีการวางการ์ดในช่องหรือไม่
+            # ตรวจสอบว่ามีการวางการ์ดในแต่ละช่องหรือไม่
             has_cards = False
-            for slot in self.stage.slots:
+            print("--------------------------------------------")
+            print("[GameManager] ตรวจสอบการ์ดในแต่ละช่อง:")
+            for i, slot in enumerate(self.stage.slots):
                 if slot.card:
                     has_cards = True
-                    break
+                    print(f"  ช่อง {i+1} ({slot.card_type.value}): {slot.card.card_name}")
+                else:
+                    print(f"  ช่อง {i+1} ({slot.card_type.value}): ว่างเปล่า (None)")
+            print("--------------------------------------------")
                     
             if not has_cards:
-                print("[GameManager] No cards placed, cannot start algorithm")
+                print("[GameManager] No cards placed in any slots, cannot start algorithm")
+                # รีเซ็ตอัลกอริทึมเป็น None เมื่อไม่มีการ์ด
+                if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                    self.current_algorithm.stop()
+                    self.current_algorithm = None
+                    print("[GameManager] Reset algorithm to None due to no cards placed")
                 return
             
             # บันทึกอัลกอริทึมที่ใช้
             algorithm_name, algorithm_type = self.stage.get_selected_algorithm()
             if algorithm_name:
+                print(f"[GameManager] เลือกใช้อัลกอริทึม: {algorithm_name} ({algorithm_type})")
                 self.statistics.set_algorithm(algorithm_name, algorithm_type)
             
             # เรียกอัลกอริทึมจาก stage
+            print("[GameManager] กำลังเรียกใช้ run_algorithm() ของ stage...")
             result = self.stage.run_algorithm(self.costmap, self.statistics)
             
-            if not result:
-                print("[GameManager] Failed to start algorithm")
+            # ตรวจสอบค่าที่ได้จาก run_algorithm
+            if result is None:
+                # กรณีไม่มีการ์ดในช่อง (ไม่ใช่ error แต่ไม่มีการ์ด)
+                print("[GameManager] No cards in slots, algorithm set to None")
+                # รีเซ็ตอัลกอริทึมเป็น None
+                if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                    self.current_algorithm.stop()
+                    self.current_algorithm = None
+                return
+            elif result is False:
+                # กรณีเกิดข้อผิดพลาดในการเริ่มอัลกอริทึม
+                print("[GameManager] Failed to start algorithm due to errors")
                 return
                 
             algorithm_class, costmap = result
+            print(f"[GameManager] ได้รับคลาสอัลกอริทึม: {algorithm_class.__name__}")
             
             # สร้างอินสแตนซ์ของอัลกอริทึม
+            print("[GameManager] กำลังสร้างอินสแตนซ์ของอัลกอริทึม...")
             self.current_algorithm = algorithm_class(costmap)
             
             # เริ่มอัลกอริทึม
+            print("[GameManager] กำลังเริ่มอัลกอริทึม...")
             success = self.current_algorithm.start()
             if not success:
                 print("[GameManager] Failed to start algorithm")
@@ -591,7 +652,7 @@ class GameManager:
                 return
                 
             print("--------------------------------------------")
-            print(f"Algorithm {algorithm_name} is running, please wait...")
+            print(f"กำลังรันอัลกอริทึม {algorithm_name}, กรุณารอสักครู่...")
             print("--------------------------------------------")
             
         except Exception as e:
@@ -675,6 +736,10 @@ class GameManager:
                     if self.camera_y > 0 and self.game_state.get_state() == GameStateEnum.CARD_CHOOSING.value:
                         self.game_state.change_state(GameStateEnum.PLAYING.value)
                         print("[GameManager] State changed to PLAYING")
+                        
+                        # ตรวจสอบและรีเซ็ตตำแหน่งหุ่นยนต์ถ้าไม่ได้อยู่ที่จุดเริ่มต้น
+                        self.__check_and_reset_robot_position()
+                        
                     elif self.camera_y <= 0 and self.game_state.get_state() == GameStateEnum.PLAYING.value:
                         self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
                         print("[GameManager] State changed to CARD_CHOOSING")
@@ -731,10 +796,13 @@ class GameManager:
                     robot_row, robot_col = self.costmap.robot_pos
                     goal_row, goal_col = self.costmap.goal_pos
                     
-                    # If robot is at goal or within 1 cell, consider goal reached
-                    distance = abs(robot_row - goal_row) + abs(robot_col - goal_col)
-                    if distance <= 1:  # Manhattan distance <= 1 (adjacent)
-                        print(f"[GameManager] Robot reached goal! Distance: {distance}")
+                    # คำนวณระยะห่างโดยใช้ทั้ง Manhattan distance และ Euclidean distance
+                    manhattan_dist = abs(robot_row - goal_row) + abs(robot_col - goal_col)
+                    euclidean_dist = ((robot_row - goal_row)**2 + (robot_col - goal_col)**2)**0.5
+                    
+                    # ใช้เกณฑ์ที่เข้มงวดกว่าเดิม - ต้องใกล้เป้าหมายจริงๆ
+                    if manhattan_dist <= 1 and euclidean_dist <= 1.0:
+                        print(f"[GameManager] Robot reached goal! Manhattan distance: {manhattan_dist}, Euclidean distance: {euclidean_dist:.2f}")
                         
                         # Force algorithm to stop running
                         self.current_algorithm.is_running = False
@@ -746,6 +814,10 @@ class GameManager:
                         # Create path if none exists
                         if not hasattr(self.current_algorithm, 'path') or not self.current_algorithm.path:
                             self.current_algorithm.path = [(robot_row, robot_col)]
+                    elif not still_running and not self.current_algorithm.is_completed:
+                        # ถ้าอัลกอริทึมหยุดทำงานแล้วแต่ยังไม่ถึงเป้าหมาย
+                        print(f"[GameManager] Algorithm stopped but goal not reached! Manhattan distance: {manhattan_dist}, Euclidean distance: {euclidean_dist:.2f}")
+                        self.current_algorithm.is_completed = False
                 
                 # If algorithm has stopped, complete the level
                 if not still_running:
@@ -812,6 +884,22 @@ class GameManager:
             
             # วาดแผนที่ลงบน surface ชั่วคราว (ปรับตำแหน่งให้เป็น 0,0)
             self.costmap.draw(map_surface, (0, 0))
+            
+            # สร้าง mask สำหรับ clipping
+            mask = pygame.Surface((rect_width, rect_height), pygame.SRCALPHA)
+            mask.fill((0, 0, 0, 0))  # ทำให้โปร่งใสทั้งหมด
+            
+            # วาดสี่เหลี่ยมบน mask ด้วยขอบมน
+            pygame.draw.rect(
+                mask, 
+                (255, 255, 255, 255),  # สีขาวทึบ 
+                (0, 0, rect_width, rect_height),
+                0,  # ความหนา 0 คือเติมสีทั้งหมด
+                border_radius=10  # ขอบมน
+            )
+            
+            # ใช้ mask กับ map_surface (ทำ clipping)
+            map_surface.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
             
             # นำแผนที่ไปวาดบนหน้าจอหลัก ตามตำแหน่งที่ต้องการ
             self.screen.blit(map_surface, rect_start)
@@ -1078,6 +1166,20 @@ class GameManager:
                 print("Already at the first level")
                 return
                 
+            # หยุดอัลกอริทึมที่กำลังทำงานอยู่
+            if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                print("[GameManager] Stopping current algorithm due to level change")
+                self.current_algorithm.stop()
+                self.current_algorithm = None
+                
+                # หยุดการจับเวลาหากกำลังจับเวลาอยู่
+                if self.statistics.is_timing:
+                    self.statistics.stop_timer()
+                    print("[GameManager] Stopped timer due to level change")
+                
+                # แสดงข้อความเตือนว่าหุ่นยนต์ถูก reset
+                self.__show_reset_warning()
+                
             # Reduce level
             self.game_state.current_level -= 1
             new_level = self.game_state.get_current_level()
@@ -1129,6 +1231,20 @@ class GameManager:
                 print(f"[GameManager] Cannot advance to level {current_level + 1} yet. Complete level {current_level} first.")
                 return False
             
+            # หยุดอัลกอริทึมที่กำลังทำงานอยู่
+            if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                print("[GameManager] Stopping current algorithm due to level change")
+                self.current_algorithm.stop()
+                self.current_algorithm = None
+                
+                # หยุดการจับเวลาหากกำลังจับเวลาอยู่
+                if self.statistics.is_timing:
+                    self.statistics.stop_timer()
+                    print("[GameManager] Stopped timer due to level change")
+                
+                # แสดงข้อความเตือนว่าหุ่นยนต์ถูก reset
+                self.__show_reset_warning()
+                
             # เก็บสถานะปัจจุบัน
             current_state = self.game_state.get_state()
             
@@ -1220,3 +1336,55 @@ class GameManager:
                 # Continue without crashing
         
         pygame.quit()
+
+    def __show_reset_warning(self):
+        """แสดงข้อความเตือนว่าหุ่นยนต์ถูก reset"""
+        # Create overlay for warning message
+        overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))  # Transparent black background (เพิ่มความทึบให้มากขึ้น)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Create warning message
+        warning_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 42)  # เพิ่มขนาดตัวอักษร
+        title_text = warning_font.render("การทำงานถูกขัดจังหวะ!", True, (255, 50, 50))  # สีแดงสำหรับข้อความหลัก
+        
+        warning_text = warning_font.render("หุ่นยนต์กำลังถูก Reset", True, (255, 255, 0))
+        sub_text = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 30).render("กำลังกลับไปยังตำแหน่งเริ่มต้นของแมพนี้...", True, (255, 255, 255))
+        
+        # Position and display warning
+        title_rect = title_text.get_rect(centerx=self.window_width // 2, centery=self.window_height // 2 - 80)
+        warning_rect = warning_text.get_rect(centerx=self.window_width // 2, centery=self.window_height // 2 - 20)
+        sub_rect = sub_text.get_rect(centerx=self.window_width // 2, centery=self.window_height // 2 + 40)
+        
+        self.screen.blit(title_text, title_rect)
+        self.screen.blit(warning_text, warning_rect)
+        self.screen.blit(sub_text, sub_rect)
+        pygame.display.flip()
+        
+        # Pause briefly to make sure user sees the message
+        pygame.time.delay(1500)  # เพิ่มเวลาเป็น 1.5 วินาที
+
+    def __check_and_reset_robot_position(self):
+        """
+        ตรวจสอบว่าหุ่นยนต์อยู่ที่จุดเริ่มต้นหรือไม่
+        ถ้าไม่ใช่ ให้รีเซ็ตแมพและตำแหน่งหุ่นยนต์
+        """
+        try:
+            # ตรวจสอบว่า costmap มีการกำหนดตำแหน่งหุ่นยนต์และตำแหน่งเริ่มต้นหรือไม่
+            if hasattr(self.costmap, 'robot_pos') and hasattr(self.costmap, 'start_pos') and self.costmap.robot_pos and self.costmap.start_pos:
+                # ตรวจสอบว่าตำแหน่งปัจจุบันของหุ่นยนต์ตรงกับตำแหน่งเริ่มต้นหรือไม่
+                if self.costmap.robot_pos != self.costmap.start_pos:
+                    print(f"[GameManager] Robot not at start position. Resetting map.")
+                    print(f"[GameManager] Current: {self.costmap.robot_pos}, Start: {self.costmap.start_pos}")
+                    
+                    # รีเซ็ตแมพและตำแหน่งหุ่นยนต์
+                    self.costmap.reset()
+                    
+                    # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้น
+                    if self.costmap.start_pos:
+                        start_row, start_col = self.costmap.start_pos
+                        self.costmap.set_robot_position(start_row, start_col)
+                        print(f"[GameManager] Robot reset to start position: {self.costmap.start_pos}")
+        except Exception as e:
+            print(f"[GameManager] Error checking/resetting robot position: {e}")
+            # Continue without crashing

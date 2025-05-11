@@ -54,16 +54,29 @@ class CardDeck:
         for area in self.__placed_cards:
             self.__placed_cards[area] = None
         
-        # Reset state of all cards
-        for card in self.__cards:
-            card.current_area = "deck"
+        # ตรวจสอบว่า placed_cards ถูกรีเซ็ตเป็น None ทั้งหมด
+        all_reset = True
+        for area, card in self.__placed_cards.items():
+            if card is not None:
+                all_reset = False
+                print(f"[CardDeck] WARNING: Area {area} still has card after reset!")
+                # บังคับให้เป็น None
+                self.__placed_cards[area] = None
+                
+        if all_reset:
+            print("[CardDeck] All placed_cards reset to None successfully")
+            
+        # รีเซ็ตตำแหน่งของการ์ดทั้งหมดกลับไปยังตำแหน่งเดิม
+        for card in self.cards:
+            # Reset position and area without touching dragging property
             card.position = card.original_position
-            card.rect.center = card.position
-            card.exit_preview_mode()
+            card.rect.center = card.original_position
+            card.current_area = "deck"
             card.hovering_area = None
             card.hovering_over_card = False
-            if hasattr(card, 'dragging'):
-                card.dragging = False
+            
+            # Debug
+            print(f"[CardDeck] Reset card {card.card_name} to position {card.position}, area: {card.current_area}")
         
         # Close preview mode
         self.__preview_mode = False
@@ -172,7 +185,7 @@ class CardDeck:
         return total_new_cards > 0  # Return True if new cards were added
     
     def handle_events(self, events):
-        """Handle game events related to cards.
+        """Handle pygame events for the card deck.
         
         Args:
             events (list): List of pygame events
@@ -196,10 +209,43 @@ class CardDeck:
                 self.__handle_mouse_down(event.pos)
             
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                self.__handle_mouse_up()
+                # ถ้ามีการปล่อยเมาส์ ให้หยุดการ drag ทุกใบ
+                for card in self.cards:
+                    if card.dragging:
+                        print(f"[CardDeck] Stopping dragging for card: {card.card_name}")
+                        self.__handle_mouse_up()
+                        # การเรียก handle_card_placement จะจัดการการวาง card ในสถานที่ที่เหมาะสม
+                        # ถ้าวางไม่ได้ การ์ดจะถูกส่งกลับไปยังตำแหน่งเดิม
             
             elif event.type == pygame.MOUSEMOTION:
                 self.__handle_mouse_motion(event.pos)
+
+    def force_stop_dragging_all_cards(self):
+        """บังคับให้ทุกการ์ดที่กำลังลากอยู่หยุดลาก"""
+        has_dragging_cards = False
+        for card in self.__cards:
+            if hasattr(card, 'dragging') and card.dragging:
+                print(f"[CardDeck] Force stop dragging for card: {card.card_name}")
+                card.stop_dragging(reset_position=True)
+                has_dragging_cards = True
+        
+        return has_dragging_cards
+
+    def reset_cards(self):
+        """Reset all cards to deck."""
+        # ก่อนรีเซ็ตการ์ด ให้หยุดการลากทุกใบ
+        has_dragging_cards = self.force_stop_dragging_all_cards()
+        
+        # รีเซ็ตการ์ดทั้งหมด
+        self.reset()
+        
+        if has_dragging_cards:
+            print("[CardDeck] Successfully stopped all dragging cards")
+        
+        # ตรวจสอบให้แน่ใจว่าไม่มีการ์ดที่ยังลากอยู่
+        for card in self.__cards:
+            if hasattr(card, 'dragging') and card.dragging:
+                print(f"[CardDeck] WARNING: Card {card.card_name} is still dragging after reset!")
     
     def __toggle_preview_mode(self):
         """Toggle between preview and normal modes."""
@@ -833,7 +879,3 @@ class CardDeck:
                 
                 if not is_placed and card.current_area != "deck":
                     card.current_area = "deck"
-
-    def reset_cards(self):
-        """Reset all cards back to the deck."""
-        self.reset()  # เรียกใช้เมธอด reset เพื่อทำงานเดียวกัน

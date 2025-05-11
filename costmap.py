@@ -44,6 +44,7 @@ class Costmap:
         # Robot position in grid coordinates
         self.robot_pos = None
         self.goal_pos = None
+        self.start_pos = None  # เพิ่ม attribute สำหรับเก็บตำแหน่งเริ่มต้นของหุ่นยนต์
         self.path = []
         
         # Load map if path is provided
@@ -114,6 +115,10 @@ class Costmap:
         # Validate input to prevent crashes
         if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
             self.robot_pos = (row, col)
+            # บันทึกตำแหน่งเริ่มต้นเมื่อตั้งค่าตำแหน่งหุ่นยนต์ครั้งแรก
+            if self.start_pos is None:
+                self.start_pos = (row, col)
+                print(f"[Costmap] Initial start position set to {self.start_pos}")
     
     def set_goal_position(self, row, col):
         """Set the goal position.
@@ -420,6 +425,7 @@ class Costmap:
                 for col in range(self.grid_width):
                     if self.grid[row, col] == 0:  # Free space
                         self.robot_pos = (row, col)
+                        self.start_pos = (row, col)  # กำหนดตำแหน่งเริ่มต้นของหุ่นยนต์
                         robot_placed = True
                         break
             
@@ -446,11 +452,16 @@ class Costmap:
         """
         Reset the costmap to its initial state.
         
-        This clears the path and maintains robot and goal positions.
+        This clears the path and resets robot to its initial position.
         """
-        # Clear the path only
+        # Clear the path
         self.path = []
         
-        # ไม่ต้องโหลดแผนที่ใหม่หรือเปลี่ยนตำแหน่งหุ่นยนต์และเป้าหมาย
-        # ล้างเฉพาะเส้นทางเท่านั้น
-        print("[Costmap] Path cleared, robot and goal positions maintained")
+        # ถ้ามีการกำหนดตำแหน่งเริ่มต้นของหุ่นยนต์ไว้ ให้รีเซ็ตกลับไปยังตำแหน่งนั้น
+        if self.start_pos:
+            prev_pos = self.robot_pos
+            self.robot_pos = self.start_pos
+            if prev_pos != self.start_pos:
+                print(f"[Costmap] Robot position reset from {prev_pos} to start position {self.start_pos}")
+        
+        print("[Costmap] Path cleared, robot reset to initial position")

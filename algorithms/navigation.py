@@ -205,10 +205,11 @@ class RRTAlgorithm(BaseAlgorithm):
         self.max_iterations = 1000
         self.step_size = 1.0
         self.goal_sample_rate = 0.2
-        self.goal_region_radius = 1.5
+        self.goal_region_radius = 1.0
         self.search_radius = 2.0
         self.node_list = []
         self.path = []
+        self.is_completed = False
         
     def plan_path(self):
         """
@@ -223,6 +224,8 @@ class RRTAlgorithm(BaseAlgorithm):
         """
         print("Planning path with RRT algorithm...")
         self.path = []
+        self.is_completed = False
+        is_path_found = False
         
         if not self.robot_pos or not self.goal_pos:
             return
@@ -250,11 +253,15 @@ class RRTAlgorithm(BaseAlgorithm):
                 
                 if self._reached_goal(new_node['pos'], goal):
                     self.path = self._generate_final_path(new_node)
-                    self.costmap.set_path(self.path)
-                    print(f"RRT path planned with {len(self.path)} steps after {i+1} iterations")
-                    return
+                    if len(self.path) > 0:
+                        self.costmap.set_path(self.path)
+                        print(f"RRT path planned with {len(self.path)} steps after {i+1} iterations")
+                        is_path_found = True
+                        return
         
-        print("No path found with RRT algorithm within iteration limit")
+        if not is_path_found:
+            print("No path found with RRT algorithm within iteration limit")
+            self.is_completed = False
         return
         
     def _get_random_node(self, goal):
@@ -402,7 +409,17 @@ class RRTAlgorithm(BaseAlgorithm):
     
     def _reached_goal(self, pos, goal):
         """Check if the goal has been reached."""
-        return self._distance(pos, goal) < self.goal_region_radius
+        # คำนวณระยะห่างแบบ Euclidean
+        distance = self._distance(pos, goal)
+        
+        # ใช้ Manhattan distance เพื่อตรวจสอบเพิ่มเติม
+        manhattan_dist = abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
+        
+        # ตรวจสอบทั้งสองเงื่อนไข
+        euclidean_reached = distance < self.goal_region_radius
+        manhattan_reached = manhattan_dist <= 1
+        
+        return euclidean_reached and manhattan_reached
     
     def _generate_final_path(self, goal_node):
         """Generate the final path from the start to the goal."""

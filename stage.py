@@ -355,8 +355,8 @@ class Stage:
         
         # Position of level change buttons at the top of the screen
         # ตำแหน่งเดิม: left_button_pos = (80, 100), right_button_pos = (Config.BOARD_WIDTH - 80, 100)
-        left_button_pos = (75, 160)  # ปุ่มซ้ายอยู่ด้านซ้ายของจอ
-        right_button_pos = (1108, 160)  # ปุ่มขวาอยู่ด้านขวาของจอ
+        left_button_pos = (75, 160)  # ปุ่มซ้ายอยู่ด้านซ้ายของจอ160
+        right_button_pos = (1108, 160)  # ปุ่มขวาอยู่ด้านขวาของจอ160
         
         # Create buttons
         reset_button = Button(reset_pos, "assets/reset_button.png", "reset")
@@ -585,12 +585,24 @@ class Stage:
             statistics: Object for recording statistics
             
         Returns:
-            bool: True if algorithm started successfully, False if not
+            (algorithm_class, costmap): Tuple of algorithm class and costmap if successful
+            None: If no cards are placed on slots
+            False: If error occurs during algorithm initialization
         """
         # Check if robot and goal positions are set
         if not costmap.robot_pos or not costmap.goal_pos:
             print("Cannot start algorithm: Robot and goal positions must be set first")
             return False
+        
+        # แสดงสถานะของแต่ละช่อง
+        print("--------------------------------------------")
+        print("[Stage] Checking slots before running algorithm:")
+        for i, slot in enumerate(self.slots):
+            if slot.card:
+                print(f"  Slot {i+1} ({slot.card_type.value}): {slot.card.card_name}")
+            else:
+                print(f"  Slot {i+1} ({slot.card_type.value}): Empty (None)")
+        print("--------------------------------------------")
             
         # Get cards in all slots
         algorithm_cards = []
@@ -600,7 +612,8 @@ class Stage:
                 
         if not algorithm_cards:
             print("Cannot start algorithm: Algorithm cards must be selected first")
-            return False
+            # Return None to indicate no cards placed (not an error, just no cards)
+            return None
             
         # Use first card for testing
         selected_card = algorithm_cards[0]
