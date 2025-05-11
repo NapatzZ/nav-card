@@ -100,7 +100,7 @@ class GameManager:
         self.update_level_buttons()
         
         # Variables for displaying time
-        self.timer_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+        self.timer_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 36)
         self.timer_rect = pygame.Rect(0, 0, 350, 50)  # Define area for time display
         self.timer_rect.centerx = self.window_width // 2
         self.timer_rect.top = 20
@@ -367,9 +367,17 @@ class GameManager:
             # Default path for map file
             pgm_file_path = os.path.join("data", "map.pgm")
             if os.path.exists(pgm_file_path):
-                success = self.costmap.load_pgm_map(pgm_file_path)
+                # ไม่ให้กำหนดตำแหน่งเริ่มต้นและเป้าหมายอัตโนมัติ เพื่อให้สอดคล้องกับ load_current_level_map
+                success = self.costmap.load_pgm_map(pgm_file_path, set_default_positions=False)
                 if success:
                     print("Successfully loaded map from", pgm_file_path)
+                    
+                    # ให้กำหนดตำแหน่งเริ่มต้นที่ตำแหน่งที่ 1 ในกรณีที่โหลดแผนที่ทั่วไป
+                    self.costmap.start_pos = (5, 2)  # ตำแหน่งเริ่มต้นของแผนที่ทั่วไป
+                    self.costmap.set_robot_position(5, 2)
+                    
+                    # กำหนดเป้าหมายสำหรับแผนที่ทั่วไป
+                    self.costmap.set_goal_position(self.costmap.grid_height - 5, self.costmap.grid_width - 5)
                 else:
                     print("Failed to load map from", pgm_file_path)
             else:
@@ -408,7 +416,10 @@ class GameManager:
             pgm_file_path = os.path.join("data", map_file)
             
             if os.path.exists(pgm_file_path):
-                success = self.costmap.load_pgm_map(pgm_file_path)
+                # โหลดแผนที่ แต่อย่าให้กำหนดตำแหน่งเริ่มต้นและเป้าหมายอัตโนมัติ
+                # ส่งพารามิเตอร์เพิ่มเติมให้กับ load_pgm_map เพื่อบอกว่าไม่ต้องกำหนดตำแหน่งอัตโนมัติ
+                success = self.costmap.load_pgm_map(pgm_file_path, set_default_positions=False)
+                
                 if success:
                     print(f"Successfully loaded map for level {current_level} from {pgm_file_path}")
                     
@@ -417,6 +428,8 @@ class GameManager:
                         # Set robot position (start)
                         start_row = int(level_data['start_row'])
                         start_col = int(level_data['start_col'])
+                        # กำหนดตำแหน่งเริ่มต้นของหุ่นยนต์ตามข้อมูลใน levels.csv
+                        self.costmap.start_pos = (start_row, start_col)
                         self.costmap.set_robot_position(start_row, start_col)
                         
                         # Set goal position
@@ -936,7 +949,7 @@ class GameManager:
                 username = self.game_state.get_username()
                 elapsed_time = self.statistics.get_elapsed_time()
                 formatted_time = self.statistics.format_time(elapsed_time)
-                font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+                font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 36)
                 
                 # Display level number (left)
                 level_text = font.render(f"Level {current_level}", True, Config.WHITE_COLOR)
@@ -972,7 +985,7 @@ class GameManager:
                     overlay.fill((0, 0, 0, 180))  # Transparent black (alpha 180/255)
                     self.screen.blit(overlay, (0, 0))
                     
-                    result_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 48)
+                    result_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 48)
                     # Use completion_success from statistics for display
                     if self.statistics.completion_success:
                         result_text = result_font.render("Success!", True, (0, 255, 0))
@@ -981,7 +994,7 @@ class GameManager:
                     result_rect = result_text.get_rect(center=(self.window_width // 2, self.window_height // 2))
                     self.screen.blit(result_text, result_rect)
                     
-                    hint_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
+                    hint_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 24)
                     hint_text = hint_font.render("Press SPACE to continue", True, Config.WHITE_COLOR)
                     hint_rect = hint_text.get_rect(center=(self.window_width // 2, self.window_height // 2 + 60))
                     self.screen.blit(hint_text, hint_rect)
@@ -998,13 +1011,13 @@ class GameManager:
                 self.screen.blit(pause_bg, (0, 0))
                 
                 # Show PAUSE text
-                pause_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 72)
+                pause_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 72)
                 pause_text = pause_font.render("PAUSE", True, Config.WHITE_COLOR)
                 pause_rect = pause_text.get_rect(center=(self.window_width // 2, self.window_height // 2))
                 self.screen.blit(pause_text, pause_rect)
                 
                 # Show instruction
-                hint_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
+                hint_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 24)
                 hint_text = hint_font.render("Press ESC to continue", True, Config.WHITE_COLOR)
                 hint_rect = hint_text.get_rect(center=(self.window_width // 2, self.window_height // 2 + 60))
                 self.screen.blit(hint_text, hint_rect)
@@ -1038,7 +1051,7 @@ class GameManager:
             self.screen.blit(notification_bg, (x_pos, y_pos))
             
             # Display title text
-            font_title = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+            font_title = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 36)
             title_text = font_title.render("New Cards Unlocked!", True, Config.WHITE_COLOR)
             title_rect = title_text.get_rect(centerx=screen_width//2, top=y_pos + 20)
             self.screen.blit(title_text, title_rect)
@@ -1063,8 +1076,8 @@ class GameManager:
             }
             
             # Display list of unlocked cards with descriptions
-            font_card = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
-            font_desc = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 16)
+            font_card = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 24)
+            font_desc = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 16)
             y_offset = 80
             
             for i, card_info in enumerate(self.new_cards):
@@ -1085,7 +1098,7 @@ class GameManager:
                 y_offset += 70  # Increased spacing between cards
                 
             # Display hint
-            font_hint = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 18)
+            font_hint = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 18)
             hint_text = font_hint.render("Press SPACE to start new game", True, Config.WHITE_COLOR)
             hint_rect = hint_text.get_rect(centerx=screen_width//2, bottom=y_pos + notification_height - 20)
             self.screen.blit(hint_text, hint_rect)
@@ -1195,8 +1208,8 @@ class GameManager:
             self.card_deck.reset_cards()
             print("[GameManager] All cards have been reset to deck")
             
-            # รีเซ็ตแผนที่
-            self.costmap.reset()
+            # ล้างเส้นทางแต่ไม่รีเซ็ตตำแหน่งหุ่นยนต์ (เพราะได้กำหนดไว้แล้วใน load_current_level_map)
+            self.costmap.path = []
             
             # อัปเดตปุ่มตามสถานะปัจจุบัน
             if current_state == GameStateEnum.PLAYING.value:
@@ -1295,8 +1308,8 @@ class GameManager:
             self.card_deck.reset_cards()
             print("[GameManager] All cards have been reset to deck")
             
-            # รีเซ็ตแผนที่
-            self.costmap.reset()
+            # ล้างเส้นทางแต่ไม่รีเซ็ตตำแหน่งหุ่นยนต์ (เพราะได้กำหนดไว้แล้วใน load_current_level_map)
+            self.costmap.path = []
             
             # อัปเดตปุ่มตามสถานะปัจจุบัน
             if current_state == GameStateEnum.PLAYING.value:
@@ -1345,11 +1358,11 @@ class GameManager:
         self.screen.blit(overlay, (0, 0))
         
         # Create warning message
-        warning_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 42)  # เพิ่มขนาดตัวอักษร
+        warning_font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 42)  # เพิ่มขนาดตัวอักษร
         title_text = warning_font.render("การทำงานถูกขัดจังหวะ!", True, (255, 50, 50))  # สีแดงสำหรับข้อความหลัก
         
         warning_text = warning_font.render("หุ่นยนต์กำลังถูก Reset", True, (255, 255, 0))
-        sub_text = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 30).render("กำลังกลับไปยังตำแหน่งเริ่มต้นของแมพนี้...", True, (255, 255, 255))
+        sub_text = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", 30).render("กำลังกลับไปยังตำแหน่งเริ่มต้นของแมพนี้...", True, (255, 255, 255))
         
         # Position and display warning
         title_rect = title_text.get_rect(centerx=self.window_width // 2, centery=self.window_height // 2 - 80)
@@ -1377,13 +1390,13 @@ class GameManager:
                     print(f"[GameManager] Robot not at start position. Resetting map.")
                     print(f"[GameManager] Current: {self.costmap.robot_pos}, Start: {self.costmap.start_pos}")
                     
-                    # รีเซ็ตแมพและตำแหน่งหุ่นยนต์
-                    self.costmap.reset()
+                    # รีเซ็ตแมพโดยล้างเฉพาะเส้นทาง ไม่ต้องรีเซ็ตทั้งแมพ
+                    self.costmap.path = []
                     
-                    # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้น
+                    # เซ็ตตำแหน่งหุ่นยนต์ไปที่จุดเริ่มต้น (ตามที่กำหนดใน levels.csv)
                     if self.costmap.start_pos:
                         start_row, start_col = self.costmap.start_pos
-                        self.costmap.set_robot_position(start_row, start_col)
+                        self.costmap.robot_pos = (start_row, start_col)  # กำหนดค่าโดยตรงแทนการเรียกฟังก์ชัน
                         print(f"[GameManager] Robot reset to start position: {self.costmap.start_pos}")
         except Exception as e:
             print(f"[GameManager] Error checking/resetting robot position: {e}")

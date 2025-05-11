@@ -26,7 +26,7 @@ class TextInput:
         self.color_inactive = pygame.Color(180, 180, 180)  # Light gray
         self.color_active = pygame.Color(255, 255, 255)    # White
         self.color = self.color_inactive
-        self.font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", font_size)
+        self.font = pygame.font.Font("assets/PixelifySans-SemiBold.ttf", font_size)
         self.text = ""
         self.active = False
         self.cursor_visible = True
@@ -141,7 +141,7 @@ class LoginScreen:
         self.button_is_hovered = False
         
         # Initialize fonts
-        font_path = "font/PixelifySans-SemiBold.ttf"
+        font_path = "assets/PixelifySans-SemiBold.ttf"
         self.title_font = pygame.font.Font(font_path, 36)
         self.label_font = pygame.font.Font(font_path, 24)
         self.info_font = pygame.font.Font(font_path, 18)

@@ -115,10 +115,6 @@ class Costmap:
         # Validate input to prevent crashes
         if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
             self.robot_pos = (row, col)
-            # บันทึกตำแหน่งเริ่มต้นเมื่อตั้งค่าตำแหน่งหุ่นยนต์ครั้งแรก
-            if self.start_pos is None:
-                self.start_pos = (row, col)
-                print(f"[Costmap] Initial start position set to {self.start_pos}")
     
     def set_goal_position(self, row, col):
         """Set the goal position.
@@ -343,11 +339,12 @@ class Costmap:
             print(f"Error in reset_demo_map: {e}")
             # Continue without crashing
 
-    def load_pgm_map(self, pgm_path):
+    def load_pgm_map(self, pgm_path, set_default_positions=True):
         """Load a map from a PGM file.
         
         Args:
             pgm_path (str): Path to the PGM file
+            set_default_positions (bool): Whether to automatically set default robot and goal positions
             
         Returns:
             bool: True if map was loaded successfully, False otherwise
@@ -401,8 +398,12 @@ class Costmap:
                 # Update the grid
                 self.grid = binary_array
                 
-                # Automatically set robot and goal positions on free spaces
-                self.set_default_robot_and_goal_positions()
+                # Automatically set robot and goal positions on free spaces if requested
+                if set_default_positions:
+                    self.set_default_robot_and_goal_positions()
+                    print("Set default robot and goal positions automatically")
+                else:
+                    print("Skipped setting default positions (will be set externally)")
                 
                 print(f"Loaded map from {pgm_path} with dimensions {self.grid.shape}")
                 return True
