@@ -3,6 +3,7 @@ import math
 from typing import List, Tuple
 from card import Card
 from config import Config
+from state import GameState  # เพิ่มการนำเข้า GameState
 
 
 class CardDeck:
@@ -36,13 +37,16 @@ class CardDeck:
         # Animation variables
         self.__hover_animation_time = 0
         
+        # เพิ่มการอ้างอิงถึง GameState
+        self.__game_state = GameState()
+        
         # Add initial test cards
         self.__add_starting_cards()
         
         # Clear any cards in invalid states
         self.__clear_unused_cards()
     
-    def reset_cards(self):
+    def reset(self):
         """Reset all cards back to the deck."""
         print("[CardDeck] Resetting all cards to deck")
         
@@ -58,6 +62,8 @@ class CardDeck:
             card.exit_preview_mode()
             card.hovering_area = None
             card.hovering_over_card = False
+            if hasattr(card, 'dragging'):
+                card.dragging = False
         
         # Close preview mode
         self.__preview_mode = False
@@ -69,32 +75,54 @@ class CardDeck:
     
     def __add_starting_cards(self):
         """Add initial cards to the deck for testing."""
-        # Define all cards here
-        cards_to_add = [
-            # Navigation cards
-            ("Navigation", "AStar"),
-            ("Navigation", "RRT"),
-            ("Navigation", "Dijkstra"),
-            ("Navigation", "BFS"),
-            ("Navigation", "DFS"),
-
-            
-            # Collision avoidance cards
-           #  ("Collision avoidance", "Potential_Field"),
-          #   ("Collision avoidance", "Dynamic_Window"),
-          #   ("Collision avoidance", "Velocity_Obstacle"),
-            
-            # Recovery cards
-         #    ("Recovery", "Backup"),
-        #     ("Recovery", "Spin"),
-        #     ("Recovery", "Random_Walk")
-        ]
-
-        for card_type, card_name in cards_to_add:
-            card = Card(card_type, card_name)
-            # No need to set initial position as they will only be shown during fanout
-            card.current_area = "deck"
-            self.__cards.append(card)
+        # ดึงข้อมูลการ์ดที่ปลดล็อกแล้วจาก GameState
+        unlocked_cards = self.__game_state.get_unlocked_cards()
+        
+        # สร้างการ์ดตามที่ปลดล็อกแล้ว
+        for card_type, card_names in unlocked_cards.items():
+            for card_name in card_names:
+                card = Card(card_type, card_name)
+                card.current_area = "deck"
+                self.__cards.append(card)
+                print(f"[CardDeck] Added {card_type} card: {card_name}")
+    
+    def update_available_cards(self):
+        """อัพเดตการ์ดที่มีให้ตรงกับการ์ดที่ปลดล็อกแล้ว"""
+        # ดึงข้อมูลการ์ดที่ปลดล็อกแล้วจาก GameState
+        unlocked_cards = self.__game_state.get_unlocked_cards()
+        
+        # เก็บการ์ดที่วางไว้บนสล็อตแล้ว
+        placed_cards = {area: card for area, card in self.__placed_cards.items() if card is not None}
+        
+        # ล้างการ์ดทั้งหมด
+        self.__cards = []
+        
+        # สร้างการ์ดตามที่ปลดล็อกแล้ว
+        for card_type, card_names in unlocked_cards.items():
+            for card_name in card_names:
+                # ตรวจสอบว่าการ์ดนี้วางอยู่บนสล็อตหรือไม่
+                is_placed = False
+                for area, placed_card in placed_cards.items():
+                    if placed_card.card_type == card_type and placed_card.card_name == card_name:
+                        # เพิ่มการ์ดที่วางไว้แล้วกลับเข้าไป
+                        self.__cards.append(placed_card)
+                        is_placed = True
+                        break
+                
+                # ถ้าการ์ดนี้ยังไม่ได้วาง ให้สร้างใหม่
+                if not is_placed:
+                    card = Card(card_type, card_name)
+                    card.current_area = "deck"
+                    self.__cards.append(card)
+        
+        # อัพเดต placed_cards ให้ชี้ไปที่การ์ดใหม่
+        for area, old_card in placed_cards.items():
+            for card in self.__cards:
+                if (card.card_type == old_card.card_type and 
+                    card.card_name == old_card.card_name and
+                    card.current_area == old_card.current_area):
+                    self.__placed_cards[area] = card
+                    break
     
     def handle_events(self, events):
         """Handle game events related to cards.
@@ -761,3 +789,7 @@ class CardDeck:
                 
                 if not is_placed and card.current_area != "deck":
                     card.current_area = "deck"
+
+    def reset_cards(self):
+        """Reset all cards back to the deck."""
+        self.reset()  # เรียกใช้เมธอด reset เพื่อทำงานเดียวกัน

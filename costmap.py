@@ -453,3 +453,16 @@ class Costmap:
                     
         # Last resort fallback
         return self.grid_height // 2, self.grid_width // 2
+
+    def reset(self):
+        """
+        Reset the costmap to its initial state.
+        
+        This clears the path and maintains robot and goal positions.
+        """
+        # Clear the path only
+        self.path = []
+        
+        # ไม่ต้องโหลดแผนที่ใหม่หรือเปลี่ยนตำแหน่งหุ่นยนต์และเป้าหมาย
+        # ล้างเฉพาะเส้นทางเท่านั้น
+        print("[Costmap] Path cleared, robot and goal positions maintained")

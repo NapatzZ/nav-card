@@ -257,8 +257,35 @@ class PGMMapBuilder:
         # Ensure data directory exists
         os.makedirs("data", exist_ok=True)
         
+        # Get list of existing map files
+        existing_files = [f for f in os.listdir("data") if f.startswith("map") and f.endswith(".pgm")]
+        
+        # Determine the next available number
+        if not existing_files:
+            # If no files exist, use map.pgm
+            file_name = "map.pgm"
+        else:
+            # Find the highest number used
+            numbers = []
+            for file in existing_files:
+                if file == "map.pgm":
+                    numbers.append(0)
+                else:
+                    try:
+                        num = int(file[3:-4])  # Extract number from mapX.pgm
+                        numbers.append(num)
+                    except ValueError:
+                        continue
+            
+            if not numbers:
+                next_num = 1
+            else:
+                next_num = max(numbers) + 1
+            
+            file_name = f"map{next_num}.pgm"
+        
         # Save the PGM file
-        file_path = os.path.join("data", "map.pgm")
+        file_path = os.path.join("data", file_name)
         
         try:
             with open(file_path, "wb") as f:

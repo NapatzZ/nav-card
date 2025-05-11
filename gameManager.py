@@ -8,9 +8,12 @@ import time
 from config import Config
 from cardDeck import CardDeck 
 from card import Card
-from state import GameState
+from state import GameState, GameStateEnum
 from stage import Stage
 from costmap import Costmap
+from login_screen import LoginScreen
+from statistic import Statistics
+from player_data import PlayerData
 
 class GameManager:
     """
@@ -43,10 +46,21 @@ class GameManager:
         self.screen = pygame.display.set_mode((self.window_width, self.window_height))
         pygame.display.set_caption("Card Game")
         
+        # Initialize game state first
+        self.game_state = GameState()  # Use singleton pattern
+        
+        # Initialize statistics
+        self.statistics = Statistics()
+        
+        # Initialize player data manager
+        self.player_data = PlayerData()
+        
+        # Initialize login screen
+        self.login_screen = LoginScreen(self.window_width, self.window_height)
+        
         # Initialize game components
         self.stage = Stage()
         self.card_deck = CardDeck(self.stage)
-        self.game_state = GameState()  # Use new singleton pattern
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -75,6 +89,24 @@ class GameManager:
         self.algorithm_start_time = 0
         self.should_auto_start = False
         self.auto_start_delay = 2 
+        
+        # Variables for displaying newly unlocked cards
+        self.new_cards_notification = False
+        self.new_cards = []
+        self.notification_start_time = 0
+        self.notification_duration = 5  # Display for 5 seconds
+        
+        # Load map for current level
+        self.load_current_level_map()
+        
+        # Update level button states
+        self.update_level_buttons()
+        
+        # Variables for displaying time
+        self.timer_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+        self.timer_rect = pygame.Rect(0, 0, 200, 50)  # Define area for time display
+        self.timer_rect.centerx = self.window_width // 2
+        self.timer_rect.top = 20
     
     def handle_events(self):
         """
@@ -87,6 +119,52 @@ class GameManager:
         """
         events = pygame.event.get()
         
+        # ถ้าอยู่ในหน้าล็อกอิน ให้จัดการอีเวนต์ของหน้าล็อกอินเท่านั้น
+        if self.game_state.get_state() == GameStateEnum.LOGIN.value:
+            for event in events:
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    
+            # จัดการอีเวนต์ของหน้าล็อกอิน
+            login_success = self.login_screen.handle_events(events)
+            if login_success:
+                # เมื่อล็อกอินสำเร็จ ให้เปลี่ยนสถานะเกมเป็น CARD_CHOOSING
+                username = self.login_screen.get_username()
+                self.game_state.set_username(username)
+                self.statistics.set_username(username)
+                self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
+                print(f"User logged in as: {username}")
+            return
+            
+        # ตรวจสอบการกด ESC เพื่อเข้าสู่โหมด PAUSE
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                # ถ้าอยู่ในโหมด PAUSE ให้กลับไปยังสถานะก่อนหน้า
+                if self.game_state.get_state() == GameStateEnum.PAUSE.value:
+                    # หากกำลังเล่นอยู่ในโหมด PLAYING ก่อนจะ PAUSE
+                    # ให้เริ่มจับเวลาใหม่โดยตั้งค่าเวลาเริ่มต้นใหม่
+                    # การรีเซ็ตนี้ทำให้เวลาเริ่มนับต่อจากจุดที่หยุดไว้
+                    self.statistics.start_timer()
+                    
+                    # เปลี่ยนกลับไปยังสถานะก่อนหน้า (PLAYING หรือ CARD_CHOOSING)
+                    if self.camera_y > 0:
+                        self.game_state.change_state(GameStateEnum.PLAYING.value)
+                    else:
+                        self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
+                    return  # ดำเนินการต่อโดยไม่ต้องทำส่วนอื่น
+                    
+                # เข้าสู่โหมด PAUSE
+                self.game_state.change_state(GameStateEnum.PAUSE.value)
+                
+                # หยุดการจับเวลาชั่วคราว
+                self.statistics.stop_timer(pause=True)
+                return  # ดำเนินการต่อโดยไม่ต้องทำส่วนอื่น
+        
+        # ถ้าอยู่ในโหมด PAUSE ไม่ต้องประมวลผลอีเวนต์อื่นๆ
+        if self.game_state.get_state() == GameStateEnum.PAUSE.value:
+            return
+        
+        # ถ้าไม่ได้อยู่ในหน้าล็อกอิน ให้จัดการอีเวนต์ของเกมตามปกติ
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
@@ -99,8 +177,64 @@ class GameManager:
             # Handle key press for switching between placing robot/goal
             elif event.type == pygame.KEYDOWN:
                 try:
-                    if event.key == pygame.K_SPACE and self.game_state.current_state == "PLAYING":
-                        self.reset_game()
+                    if event.key == pygame.K_SPACE:
+                        if self.game_state.get_state() == GameStateEnum.PLAYING.value:
+                            print("[GameManager] Spacebar pressed in PLAYING mode, returning to CARD_CHOOSING mode")
+                            
+                            # หยุดอัลกอริทึมที่กำลังทำงาน
+                            if hasattr(self, 'current_algorithm') and self.current_algorithm:
+                                self.current_algorithm.stop()
+                                self.current_algorithm = None
+                            
+                            # ล้างเส้นทางสีเขียว โดยไม่โหลดแผนที่ใหม่
+                            self.costmap.reset()
+                            print("[GameManager] Reset costmap, cleared path only")
+                            
+                            # เลื่อนกล้องลงและเปลี่ยนเป็นโหมด CARD_CHOOSING โดยตรง
+                            self.target_camera_y = 0
+                            self.camera_animating = True
+                            
+                            # หยุดการจับเวลา
+                            if self.statistics.is_timing:
+                                self.statistics.stop_timer()
+                                self.statistics.set_completion_success(False)
+                                # ไม่บันทึกข้อมูลเนื่องจากเป็นการยกเลิก
+                                # self.statistics.save_all_data()
+                            
+                            # เปลี่ยนสถานะเกมเป็น CARD_CHOOSING
+                            self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
+                            
+                            # ตั้งค่าไม่ให้อยู่ในโหมดเกม
+                            self.card_deck.set_game_stage(False)
+                            
+                            # แสดงปุ่มทั้งหมดอีกครั้ง
+                            print("Showing all buttons including start and reset")
+                            for button in self.stage.buttons:
+                                button.set_visible(True)
+                                
+                        elif self.game_state.get_state() == GameStateEnum.FINISH.value:
+                            # เมื่ออยู่ในโหมด FINISH และกด Space ให้เริ่มเกมใหม่
+                            print("[GameManager] Spacebar pressed in FINISH mode, returning to CARD_CHOOSING mode")
+                            
+                            # ล้างเส้นทางและรีเซ็ทสถานะ
+                            self.costmap.reset()
+                            
+                            # เลื่อนกล้องลงและเปลี่ยนเป็นโหมด CARD_CHOOSING โดยตรง
+                            self.target_camera_y = 0
+                            self.camera_animating = True
+                            
+                            # เปลี่ยนสถานะเกมเป็น CARD_CHOOSING
+                            self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
+                            
+                            # ตั้งค่าไม่ให้อยู่ในโหมดเกม
+                            self.card_deck.set_game_stage(False)
+                            
+                            # แสดงปุ่มทั้งหมดอีกครั้ง
+                            for button in self.stage.buttons:
+                                button.set_visible(True)
+                    # เพิ่มปุ่ม N สำหรับเลื่อนไปด่านถัดไป (สำหรับการทดสอบ)
+                    elif event.key == pygame.K_n:
+                        self.advance_to_next_level()
                 except Exception as e:
                     print(f"Error handling key press: {e}")
             
@@ -186,10 +320,14 @@ class GameManager:
             elif action == "place_goal":
                 self.place_robot_mode = False
                 print("Now placing: Goal (red)")
+            elif action == "next_level_valid":
+                self.advance_to_next_level()
+            elif action == "prev_level_valid":
+                self.go_to_previous_level()
         except Exception as e:
             print(f"Error handling button action: {e}")
             # Continue without crashing
-    
+            
     def load_map(self):
         """
         Load a map from a PGM file.
@@ -210,43 +348,79 @@ class GameManager:
         except Exception as e:
             print(f"Error loading map: {e}")
             # Continue without crashing
+            
+    def load_current_level_map(self):
+        """
+        โหลดแมพตามด่านปัจจุบัน
+        """
+        try:
+            # รับหมายเลขด่านปัจจุบัน
+            current_level = self.game_state.get_current_level()
+            
+            # อัพเดตข้อมูลด่านในสถิติ
+            self.statistics.set_level(current_level)
+            
+            # สร้างชื่อไฟล์แมพตามด่าน
+            map_file = f"map{current_level}.pgm"
+            pgm_file_path = os.path.join("data", map_file)
+            
+            if os.path.exists(pgm_file_path):
+                success = self.costmap.load_pgm_map(pgm_file_path)
+                if success:
+                    print(f"Successfully loaded map for level {current_level} from {pgm_file_path}")
+                else:
+                    print(f"Failed to load map for level {current_level} from {pgm_file_path}")
+                    # ถ้าโหลดไม่สำเร็จ ให้ใช้แมพทั่วไป
+                    self.load_map()
+            else:
+                print(f"No map file found for level {current_level} at {pgm_file_path}")
+                # ถ้าไม่มีไฟล์แมพสำหรับด่านนี้ ให้ใช้แมพทั่วไป
+                self.load_map()
+        except Exception as e:
+            print(f"Error loading level map: {e}")
+            # Continue without crashing
     
     def reset_game(self):
         """
         Reset the game to its initial state.
         
         This includes:
-        - Removing cards from slots
-        - Resetting the card deck
+        - Resetting card deck
+        - Resetting costmap
+        - Recalculating camera position
         - Changing game state
-        - Resetting camera position
-        - Showing all buttons
-        - Stopping any running algorithm
+        - Showing UI buttons
         """
         try:
             print("[GameManager] Resetting game...")
             
-            # Remove cards from all slots
-            for slot in self.stage.slots:
-                slot.card = None
+            # หยุดจับเวลาและบันทึกข้อมูลสถิติ
+            if self.statistics.is_timing:
+                self.statistics.stop_timer()
+                self.statistics.set_completion_success(False)  # กำหนดว่าไม่สำเร็จเมื่อรีเซ็ตเกม
+                self.statistics.save_all_data()
             
-            # Call reset_cards from card_deck
-            self.card_deck.reset_cards()
+            # Reset card deck to initial state
+            self.card_deck.reset()
             
-            # Change game state to PLAYING
-            self.game_state.change_state("PLAYING")
+            # Reset costmap to initial state
+            self.costmap.reset()
+            
+            # Recalculate camera position
+            self.target_camera_y = 0
+            self.camera_animating = True
+            
+            # Change game state to CARD_CHOOSING
+            self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
             
             # Set state to card selection mode (not gameplay mode)
             self.card_deck.set_game_stage(False)
             
-            # Reset camera to initial position
-            self.target_camera_y = 0
-            self.camera_animating = True
-            
             # Reset to robot placement mode
             self.place_robot_mode = True
             
-            # Show all buttons again
+            # Show all buttons again, including start and reset buttons
+            print("Showing all buttons including start and reset")
             for button in self.stage.buttons:
                 button.set_visible(True)
             
@@ -254,6 +428,9 @@ class GameManager:
             if hasattr(self, 'current_algorithm') and self.current_algorithm:
                 self.current_algorithm.stop()
                 self.current_algorithm = None
+                
+            # ปิดการแจ้งเตือนการ์ดใหม่
+            self.new_cards_notification = False
         except Exception as e:
             print(f"Error resetting game: {e}")
             # Continue without crashing
@@ -272,7 +449,7 @@ class GameManager:
         try:
             print("[GameManager] Starting game...")
             # Change game state to PLAYING
-            self.game_state.change_state("PLAYING")
+            self.game_state.change_state(GameStateEnum.PLAYING.value)
             
             # Set state to gameplay mode
             self.card_deck.set_game_stage(True)
@@ -289,6 +466,9 @@ class GameManager:
             self.algorithm_start_time = time.time()
             self.should_auto_start = True
             
+            # เริ่มจับเวลา
+            self.statistics.start_timer()
+            
             # Show message to user about auto-starting
             print("--------------------------------------------")
             print(f"Game will start automatically in {self.auto_start_delay} seconds")
@@ -298,70 +478,82 @@ class GameManager:
             # Continue without crashing
     
     def run_algorithm(self):
-        """Run the selected algorithm to navigate robot to goal."""
+        """Run the selected algorithm."""
         try:
             print("[GameManager] Running algorithm...")
             
-            # Check if robot and goal are set
-            if not self.costmap.robot_pos or not self.costmap.goal_pos:
-                print("Cannot start algorithm: Robot and goal positions must be set first")
+            # บันทึกอัลกอริทึมที่ใช้
+            algorithm_name, algorithm_type = self.stage.get_selected_algorithm()
+            if algorithm_name:
+                self.statistics.set_algorithm(algorithm_name, algorithm_type)
+            
+            # เรียกอัลกอริทึมจาก stage
+            result = self.stage.run_algorithm(self.costmap, self.statistics)
+            
+            if not result:
+                print("[GameManager] Failed to start algorithm")
                 return
+                
+            algorithm_class, costmap = result
             
-            # Get all cards in slots
-            algorithm_cards = []
-            for slot in self.stage.slots:
-                if slot.card:
-                    algorithm_cards.append(slot.card)
+            # สร้างอินสแตนซ์ของอัลกอริทึม
+            self.current_algorithm = algorithm_class(costmap)
             
-            if not algorithm_cards:
-                print("Cannot start algorithm: Algorithm cards must be selected first")
-                return
-            
-            # For testing, use the first card
-            selected_card = algorithm_cards[0]
-            print(f"Using algorithm: {selected_card.card_name} ({selected_card.card_type})")
-            
-            # Get algorithm class based on card type and name
-            algorithm_class = None
-            
-            # Import algorithm modules
-            from algorithms.navigation import NAVIGATION_ALGORITHMS
-            from algorithms.collision_avoidance import COLLISION_AVOIDANCE_ALGORITHMS
-            from algorithms.recovery import RECOVERY_ALGORITHMS
-            
-            # Look up algorithm class based on card type and name
-            if selected_card.card_type == "Navigation":
-                algorithm_class = NAVIGATION_ALGORITHMS.get(selected_card.card_name)
-            elif selected_card.card_type == "Collision avoidance":
-                algorithm_class = COLLISION_AVOIDANCE_ALGORITHMS.get(selected_card.card_name)
-            elif selected_card.card_type == "Recovery":
-                algorithm_class = RECOVERY_ALGORITHMS.get(selected_card.card_name)
-            
-            if not algorithm_class:
-                print(f"Algorithm not found for card: {selected_card.card_name}")
-                return
-            
-            # Create algorithm instance
-            self.current_algorithm = algorithm_class(self.costmap)
-            
-            # Start algorithm
+            # เริ่มอัลกอริทึม
             success = self.current_algorithm.start()
             if not success:
-                print("Failed to start algorithm")
+                print("[GameManager] Failed to start algorithm")
                 self.current_algorithm = None
                 return
+                
+            print("--------------------------------------------")
+            print(f"Algorithm {algorithm_name} is running, please wait...")
+            print("--------------------------------------------")
             
-            print("--------------------------------------------")
-            print(f"Algorithm {selected_card.card_name} is running, please wait...")
-            print("--------------------------------------------")
         except Exception as e:
-            print(f"Error starting algorithm: {e}")
-            self.current_algorithm = None
+            print(f"Error running algorithm: {e}")
             # Continue without crashing
+    
+    def on_algorithm_complete(self, success, path_length=0):
+        """
+        Callback เมื่ออัลกอริทึมทำงานเสร็จสิ้น
+        
+        Args:
+            success (bool): สถานะความสำเร็จของอัลกอริทึม
+            path_length (int): ความยาวของเส้นทางที่พบ (ถ้ามี)
+        """
+        try:
+            print(f"[GameManager] Algorithm completed with success: {success}, path length: {path_length}")
+            
+            # หยุดจับเวลาและบันทึกข้อมูลสถิติ
+            if self.statistics.is_timing:
+                self.statistics.stop_timer()
+                self.statistics.set_completion_success(success)
+                self.statistics.save_all_data()
+            
+            # เปลี่ยนระดับถ้าเล่นสำเร็จ และบันทึกข้อมูลผู้เล่น
+            if success:
+                # บันทึกว่าผู้เล่นผ่านด่านนี้แล้ว
+                self.game_state.complete_current_level()
+                
+                # บันทึกข้อมูลผู้เล่น
+                self.player_data.save_player_data(self.game_state.get_username())
+            
+        except Exception as e:
+            print(f"Error in algorithm complete callback: {e}")
     
     def update(self):
         """Update the game state."""
         try:
+            # ถ้าอยู่ในหน้าล็อกอิน ให้อัพเดตหน้าล็อกอินเท่านั้น
+            if self.game_state.get_state() == GameStateEnum.LOGIN.value:
+                self.login_screen.update()
+                return
+                
+            # ถ้าอยู่ในโหมด PAUSE ไม่ต้องอัปเดตอะไร
+            if self.game_state.get_state() == GameStateEnum.PAUSE.value:
+                return
+                
             # Update camera animation
             if self.camera_animating:
                 diff = self.target_camera_y - self.camera_y
@@ -370,6 +562,12 @@ class GameManager:
                 else:
                     self.camera_y = self.target_camera_y
                     self.camera_animating = False
+                    
+                    # ตรวจสอบตำแหน่งกล้องเพื่อกำหนดสถานะเกม
+                    if self.camera_y > 0 and self.game_state.get_state() == GameStateEnum.CARD_CHOOSING.value:
+                        self.game_state.change_state(GameStateEnum.PLAYING.value)
+                    elif self.camera_y <= 0 and self.game_state.get_state() == GameStateEnum.PLAYING.value:
+                        self.game_state.change_state(GameStateEnum.CARD_CHOOSING.value)
             
             # Check if algorithm should auto-start
             if self.should_auto_start and time.time() - self.algorithm_start_time >= self.auto_start_delay:
@@ -382,12 +580,48 @@ class GameManager:
             # Update cards
             self.card_deck.update()
             
+            # อัพเดตสถานะของปุ่มเปลี่ยนด่าน
+            self.update_level_buttons()
+            
             # Update algorithm if running
             if hasattr(self, 'current_algorithm') and self.current_algorithm:
                 still_running = self.current_algorithm.update()
+                
+                # บันทึกตำแหน่งหุ่นยนต์ถ้ามีการเคลื่อนที่
+                if self.costmap.robot_pos:
+                    self.statistics.add_robot_position(
+                        self.costmap.robot_pos[0], 
+                        self.costmap.robot_pos[1]
+                    )
+                
                 if not still_running:
                     print("Algorithm completed or stopped.")
+                    
+                    # เรียกใช้ callback เมื่ออัลกอริทึมทำงานเสร็จสิ้น
+                    success = self.current_algorithm.is_completed
+                    path_length = len(self.current_algorithm.path) if hasattr(self.current_algorithm, 'path') else 0
+                    self.on_algorithm_complete(success, path_length)
+                    
                     self.current_algorithm = None
+                    
+                    # เมื่ออัลกอริทึมทำงานเสร็จ ให้บันทึกว่าด่านปัจจุบันผ่านแล้ว
+                    if success:
+                        self.game_state.complete_current_level()
+                        
+                    # เปลี่ยนสถานะเกมเป็น FINISH
+                    self.game_state.change_state(GameStateEnum.FINISH.value)
+                    
+                    # แสดงปุ่มสำหรับไปด่านถัดไป
+                    self.update_level_buttons()
+                    
+                    # แสดงข้อความว่าผ่านด่านแล้ว
+                    if success:
+                        print(f"Completed level {self.game_state.get_current_level()}!")
+                    
+            # อัพเดตการแสดงการ์ดที่ปลดล็อกใหม่
+            if self.new_cards_notification:
+                if time.time() - self.notification_start_time >= self.notification_duration:
+                    self.new_cards_notification = False
         except Exception as e:
             print(f"Error updating game: {e}")
             # Continue without crashing
@@ -398,6 +632,12 @@ class GameManager:
             # Clear the screen
             self.screen.fill(Config.BACKGROUND_COLOR)
             
+            # ถ้าอยู่ในหน้าล็อกอิน ให้วาดหน้าล็อกอินเท่านั้น
+            if self.game_state.get_state() == GameStateEnum.LOGIN.value:
+                self.login_screen.draw(self.screen)
+                pygame.display.flip()
+                return
+                
             # Find card being dragged
             dragging_card = None
             for card in self.card_deck.cards:
@@ -433,14 +673,268 @@ class GameManager:
                 border_radius=10  # Rounded corners
             )
             
-            # Draw buttons separately without camera offset
+            # Draw buttons separately
             for button in self.stage.buttons:
-                button.draw(self.screen)
+                if hasattr(button, 'is_level_button') and button.is_level_button:
+                    # Level buttons should always stay at the top (use camera_offset at the top)
+                    if self.camera_y > 0:
+                        # When camera moves down, display buttons at the original position
+                        original_pos = button.position
+                        button.rect.center = (original_pos[0], original_pos[1] + self.camera_y)
+                        button.draw(self.screen)
+                        button.rect.center = original_pos
+                    else:
+                        # When camera is at the top, display buttons normally
+                        button.draw(self.screen)
+                else:
+                    # Other buttons display normally
+                    button.draw(self.screen)
+            
+            # Display information only when camera is at the top (camera_y > 0)
+            # Do not display information when camera moves down (camera_y <= 0)
+            if self.camera_y > 0:
+                # Display information at normal position
+                current_level = self.game_state.get_current_level()
+                username = self.game_state.get_username()
+                elapsed_time = self.statistics.get_elapsed_time()
+                formatted_time = self.statistics.format_time(elapsed_time)
+                font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+                
+                # Display level number (left)
+                level_text = font.render(f"Level {current_level}", True, Config.WHITE_COLOR)
+                self.screen.blit(level_text, (20, 20))
+                
+                # Display player name (right)
+                username_text = font.render(f"Player: {username}", True, Config.WHITE_COLOR)
+                username_rect = username_text.get_rect(topright=(self.window_width - 20, 20))
+                self.screen.blit(username_text, username_rect)
+                
+                # Display elapsed time (center)
+                timer_bg = pygame.Surface((200, 45), pygame.SRCALPHA)
+                timer_bg.fill((0, 0, 0, 128))
+                timer_rect = timer_bg.get_rect(centerx=self.window_width // 2, top=20)
+                self.screen.blit(timer_bg, timer_rect)
+                
+                timer_text = self.timer_font.render(formatted_time, True, Config.WHITE_COLOR)
+                timer_text_rect = timer_text.get_rect(center=timer_rect.center)
+                self.screen.blit(timer_text, timer_text_rect)
+                
+                # ถ้าอยู่ในโหมด FINISH แสดงข้อความเพิ่มเติม
+                if self.game_state.get_state() == GameStateEnum.FINISH.value:
+                    # สร้างพื้นหลังโปร่งใสสีดำเพื่อลดโทนแสงหน้าจอให้มืด
+                    overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+                    overlay.fill((0, 0, 0, 180))  # สีดำโปร่งใส (ค่า alpha 180/255)
+                    self.screen.blit(overlay, (0, 0))
+                    
+                    result_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 48)
+                    if hasattr(self, 'current_algorithm') and self.current_algorithm and self.current_algorithm.is_completed:
+                        result_text = result_font.render("Success!", True, (0, 255, 0))
+                    else:
+                        result_text = result_font.render("Failed!", True, (255, 0, 0))
+                    result_rect = result_text.get_rect(center=(self.window_width // 2, self.window_height // 2))
+                    self.screen.blit(result_text, result_rect)
+                    
+                    hint_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
+                    hint_text = hint_font.render("Press SPACE to continue", True, Config.WHITE_COLOR)
+                    hint_rect = hint_text.get_rect(center=(self.window_width // 2, self.window_height // 2 + 60))
+                    self.screen.blit(hint_text, hint_rect)
+            
+            # Display new card unlocked notification
+            if self.new_cards_notification and self.new_cards:
+                self.draw_new_cards_notification()
+                
+            # ถ้าอยู่ในโหมด PAUSE แสดงข้อความ
+            if self.game_state.get_state() == GameStateEnum.PAUSE.value:
+                # สร้างพื้นหลังโปร่งใส
+                pause_bg = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
+                pause_bg.fill((0, 0, 0, 150))  # สีดำโปร่งใส
+                self.screen.blit(pause_bg, (0, 0))
+                
+                # แสดงข้อความ PAUSE
+                pause_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 72)
+                pause_text = pause_font.render("PAUSE", True, Config.WHITE_COLOR)
+                pause_rect = pause_text.get_rect(center=(self.window_width // 2, self.window_height // 2))
+                self.screen.blit(pause_text, pause_rect)
+                
+                # แสดงคำแนะนำ
+                hint_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
+                hint_text = hint_font.render("Press ESC to continue", True, Config.WHITE_COLOR)
+                hint_rect = hint_text.get_rect(center=(self.window_width // 2, self.window_height // 2 + 60))
+                self.screen.blit(hint_text, hint_rect)
             
             # Update the display
             pygame.display.flip()
         except Exception as e:
             print(f"Error drawing game: {e}")
+            # Continue without crashing
+            
+    def draw_new_cards_notification(self):
+        """Display notification for newly unlocked cards"""
+        try:
+            # Create background for notification
+            notification_width = 500
+            notification_height = 300
+            
+            # Calculate center position of screen
+            screen_width, screen_height = self.screen.get_size()
+            x_pos = (screen_width - notification_width) // 2
+            y_pos = (screen_height - notification_height) // 2
+            
+            # Create transparent background
+            notification_bg = pygame.Surface((notification_width, notification_height), pygame.SRCALPHA)
+            notification_bg.fill((0, 0, 0, 180))  # Transparent black
+            
+            # Display background
+            self.screen.blit(notification_bg, (x_pos, y_pos))
+            
+            # Display title text
+            font_title = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 36)
+            title_text = font_title.render("New Cards Unlocked!", True, Config.WHITE_COLOR)
+            title_rect = title_text.get_rect(centerx=screen_width//2, top=y_pos + 20)
+            self.screen.blit(title_text, title_rect)
+            
+            # Display list of unlocked cards
+            font_card = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 24)
+            for i, card_info in enumerate(self.new_cards):
+                card_text = font_card.render(f"{card_info['type']}: {card_info['name']}", True, Config.WHITE_COLOR)
+                card_rect = card_text.get_rect(centerx=screen_width//2, top=y_pos + 80 + i * 40)
+                self.screen.blit(card_text, card_rect)
+                
+            # Display hint
+            font_hint = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 18)
+            hint_text = font_hint.render("Press SPACE to start new game", True, Config.WHITE_COLOR)
+            hint_rect = hint_text.get_rect(centerx=screen_width//2, bottom=y_pos + notification_height - 20)
+            self.screen.blit(hint_text, hint_rect)
+            
+        except Exception as e:
+            print(f"Error drawing new cards notification: {e}")
+            # Continue without crashing
+    
+    def update_level_buttons(self):
+        """
+        Update the state of level change buttons
+        """
+        try:
+            current_level = self.game_state.get_current_level()
+            
+            # ค้นหาปุ่มจากรายการปุ่มทั้งหมด
+            left_valid_button = None
+            left_invalid_button = None
+            right_valid_button = None
+            right_invalid_button = None
+            
+            for button in self.stage.buttons:
+                if button.action_name == "prev_level_valid":
+                    left_valid_button = button
+                elif button.action_name == "prev_level_invalid":
+                    left_invalid_button = button
+                elif button.action_name == "next_level_valid":
+                    right_valid_button = button
+                elif button.action_name == "next_level_invalid":
+                    right_invalid_button = button
+            
+            # ถ้าอยู่ที่ด่านแรก ปุ่มซ้ายจะเป็น invalid
+            if current_level <= 1:
+                if left_valid_button:
+                    left_valid_button.set_visible(False)
+                if left_invalid_button:
+                    left_invalid_button.set_visible(True)
+            else:
+                if left_valid_button:
+                    left_valid_button.set_visible(True)
+                if left_invalid_button:
+                    left_invalid_button.set_visible(False)
+                    
+            # ตรวจสอบว่าสามารถไปด่านถัดไปได้หรือไม่
+            can_advance = self.game_state.can_advance_to_level(current_level + 1)
+            
+            # ถ้าอยู่ที่ด่านสุดท้ายหรือไม่สามารถไปด่านถัดไปได้ ปุ่มขวาจะเป็น invalid
+            if current_level >= 11 or not can_advance:
+                if right_valid_button:
+                    right_valid_button.set_visible(False)
+                if right_invalid_button:
+                    right_invalid_button.set_visible(True)
+            else:
+                if right_valid_button:
+                    right_valid_button.set_visible(True)
+                if right_invalid_button:
+                    right_invalid_button.set_visible(False)
+        except Exception as e:
+            print(f"Error updating level buttons: {e}")
+            # Continue without crashing
+            
+    def go_to_previous_level(self):
+        """
+        ย้อนกลับไปด่านก่อนหน้า
+        """
+        try:
+            current_level = self.game_state.get_current_level()
+            
+            # ถ้าอยู่ที่ด่านแรกอยู่แล้ว ไม่ต้องทำอะไร
+            if current_level <= 1:
+                print("Already at the first level")
+                return
+                
+            # ลดระดับด่าน
+            self.game_state.current_level -= 1
+            new_level = self.game_state.get_current_level()
+            print(f"Going back to level {new_level}")
+            
+            # โหลดแมพของด่านใหม่
+            self.load_current_level_map()
+            
+            # รีเซ็ตเกม
+            self.reset_game()
+            
+        except Exception as e:
+            print(f"Error going to previous level: {e}")
+            # Continue without crashing
+    
+    def advance_to_next_level(self):
+        """เลื่อนไปยังด่านถัดไปและปลดล็อกการ์ดใหม่"""
+        try:
+            current_level = self.game_state.get_current_level()
+            
+            # ตรวจสอบว่าสามารถไปด่านถัดไปได้หรือไม่
+            if not self.game_state.can_advance_to_level(current_level + 1):
+                print(f"Cannot advance to level {current_level + 1} yet. Complete level {current_level} first.")
+                return
+            
+            # บันทึกว่าด่านปัจจุบันผ่านแล้ว
+            self.game_state.complete_current_level()
+                
+            # เลื่อนไปด่านถัดไป
+            newly_unlocked = self.game_state.advance_level()
+            
+            # โหลดแมพของด่านใหม่
+            self.load_current_level_map()
+            
+            # แสดงข้อมูลด่านใหม่
+            current_level = self.game_state.get_current_level()
+            print(f"Advanced to level {current_level}")
+            
+            # ถ้ามีการ์ดที่ปลดล็อกใหม่ ให้แสดงการแจ้งเตือน
+            if newly_unlocked:
+                self.new_cards = newly_unlocked
+                self.new_cards_notification = True
+                self.notification_start_time = time.time()
+                
+                # แสดงข้อมูลการ์ดที่ปลดล็อกใหม่
+                print("Unlocked new cards:")
+                for card_info in newly_unlocked:
+                    print(f"- {card_info['type']}: {card_info['name']}")
+                    
+                # อัพเดตการ์ดที่มีในเกม
+                self.card_deck.update_available_cards()
+                
+            # บันทึกข้อมูลผู้เล่นหลังจากเลื่อนด่าน
+            self.player_data.save_player_data(self.game_state.get_username())
+            
+            # รีเซ็ตเกมหลังจากเลื่อนด่าน
+            self.reset_game()
+            
+        except Exception as e:
+            print(f"Error advancing to next level: {e}")
             # Continue without crashing
     
     def run(self):

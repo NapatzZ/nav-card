@@ -17,6 +17,7 @@ class Button:
         rect (pygame.Rect): Rectangle for click detection
         is_hovered (bool): Whether mouse is hovering over button
         is_visible (bool): Whether button is visible
+        is_level_button (bool): Whether this is a level change button
     """
     
     def __init__(self, position: Tuple[int, int], image_path: str, action_name: str):
@@ -30,6 +31,7 @@ class Button:
         """
         self.position = position
         self.action_name = action_name
+        self.is_level_button = False  # By default, buttons move with camera
         
         try:
             self.image = pygame.image.load(image_path)
@@ -55,12 +57,13 @@ class Button:
         """
         self.is_visible = visible
         
-    def draw(self, screen: pygame.Surface):
+    def draw(self, screen: pygame.Surface, camera_offset=(0, 0)):
         """
         Draw the button on the screen.
         
         Args:
             screen (pygame.Surface): Surface to draw on
+            camera_offset (Tuple[int, int]): Offset for camera position (x, y)
         """
         if not self.is_visible:
             return
@@ -328,15 +331,39 @@ class Stage:
         buttons = []
         
         # Calculate button positions
-        reset_pos = (Config.BOARD_WIDTH // 3, Config.BOARD_HEIGHT - 80)
-        start_pos = (Config.BOARD_WIDTH * 2 // 3, Config.BOARD_HEIGHT - 80)
+        reset_pos = (Config.BOARD_WIDTH // 4, Config.BOARD_HEIGHT - 80)
+        start_pos = (Config.BOARD_WIDTH * 2 // 4, Config.BOARD_HEIGHT - 80)
+        
+        # Position of level change buttons at the top of the screen
+        left_button_pos = (60, -124)  # Top left position
+        right_button_pos = (1100, -110)  # Top right position
         
         # Create buttons
         reset_button = Button(reset_pos, "assets/reset.png", "reset")
         start_button = Button(start_pos, "assets/startButton.png", "start")
         
+        # Level change buttons
+        left_button = Button(left_button_pos, "assets/leftValid.png", "prev_level_valid")
+        left_invalid_button = Button(left_button_pos, "assets/leftInvalid.png", "prev_level_invalid")
+        right_button = Button(right_button_pos, "assets/rightValid.png", "next_level_valid")
+        right_invalid_button = Button(right_button_pos, "assets/rightInvalid.png", "next_level_invalid")
+        
+        # Initially hide invalid buttons
+        left_invalid_button.set_visible(False)
+        right_invalid_button.set_visible(False)
+        
+        # Set which buttons are level buttons (don't move with camera)
+        left_button.is_level_button = True
+        left_invalid_button.is_level_button = True
+        right_button.is_level_button = True
+        right_invalid_button.is_level_button = True
+        
         buttons.append(reset_button)
         buttons.append(start_button)
+        buttons.append(left_button)
+        buttons.append(left_invalid_button)
+        buttons.append(right_button)
+        buttons.append(right_invalid_button)
         
         return buttons
 
@@ -448,11 +475,20 @@ class Stage:
         Returns:
             Optional[str]: Action name if a button was clicked, None otherwise
         """
-        # Buttons don't move with camera_offset, so no need to adjust mouse position
+        # ตรวจสอบการคลิกปุ่ม
         for button in self.buttons:
-            if button.is_clicked(mouse_pos):
-                print(f"[Stage] Button clicked: {button.action_name}")
-                return button.action_name
+            if button.is_visible:
+                # ถ้าเป็นปุ่มเปลี่ยนด่าน ต้องตรวจสอบตำแหน่งที่แท้จริงที่แสดงบนหน้าจอ
+                if hasattr(button, 'is_level_button') and button.is_level_button:
+                    # ใช้ rect ปัจจุบันซึ่งถูกปรับตำแหน่งแล้วในฟังก์ชัน draw
+                    if button.rect.collidepoint(mouse_pos):
+                        print(f"[Stage] Button clicked: {button.action_name}")
+                        return button.action_name
+                else:
+                    # ปุ่มอื่นๆ ตรวจสอบตามปกติ
+                    if button.is_clicked(mouse_pos):
+                        print(f"[Stage] Button clicked: {button.action_name}")
+                        return button.action_name
         
         return None
     
@@ -506,5 +542,77 @@ class Stage:
             if slot.valid_area_rect.collidepoint(pos):
                 return slot
         return None
+
+    def get_selected_algorithm(self):
+        """
+        Get the algorithm selected by the player
+        
+        Returns:
+            Tuple[str, str]: (algorithm name, algorithm type) or ("", "") if none selected
+        """
+        # Check Navigation slot card first
+        for slot in self.slots:
+            if slot.card and slot.card_type == CardType.NAVIGATION:
+                return (slot.card.card_name, slot.card.card_type)
+                
+        # If no Navigation card found but other cards exist, use other card
+        for slot in self.slots:
+            if slot.card:
+                return (slot.card.card_name, slot.card.card_type)
+                
+        # No cards at all
+        return ("", "")
+    
+    def run_algorithm(self, costmap, statistics):
+        """
+        Run algorithm based on selected cards
+        
+        Args:
+            costmap: Costmap data for robot movement
+            statistics: Object for recording statistics
+            
+        Returns:
+            bool: True if algorithm started successfully, False if not
+        """
+        # Check if robot and goal positions are set
+        if not costmap.robot_pos or not costmap.goal_pos:
+            print("Cannot start algorithm: Robot and goal positions must be set first")
+            return False
+            
+        # Get cards in all slots
+        algorithm_cards = []
+        for slot in self.slots:
+            if slot.card:
+                algorithm_cards.append(slot.card)
+                
+        if not algorithm_cards:
+            print("Cannot start algorithm: Algorithm cards must be selected first")
+            return False
+            
+        # Use first card for testing
+        selected_card = algorithm_cards[0]
+        print(f"Using algorithm: {selected_card.card_name} ({selected_card.card_type})")
+        
+        # Import algorithm modules
+        from algorithms.navigation import NAVIGATION_ALGORITHMS
+        from algorithms.collision_avoidance import COLLISION_AVOIDANCE_ALGORITHMS
+        from algorithms.recovery import RECOVERY_ALGORITHMS
+        
+        # Find algorithm class based on card type and name
+        algorithm_class = None
+        if selected_card.card_type == "Navigation":
+            algorithm_class = NAVIGATION_ALGORITHMS.get(selected_card.card_name)
+        elif selected_card.card_type == "Collision avoidance":
+            algorithm_class = COLLISION_AVOIDANCE_ALGORITHMS.get(selected_card.card_name)
+        elif selected_card.card_type == "Recovery":
+            algorithm_class = RECOVERY_ALGORITHMS.get(selected_card.card_name)
+            
+        if not algorithm_class:
+            print(f"Algorithm not found for card: {selected_card.card_name}")
+            return False
+            
+        # Let GameManager create and manage algorithm instance
+        # We just return the necessary data
+        return algorithm_class, costmap
 
 
