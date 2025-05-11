@@ -1,38 +1,49 @@
 # Nav Card
 
 ## Project Overview
-Nav Card is a 2D strategy game that combines card selection with algorithm-driven robot navigation. Players choose three algorithm cards before starting each stage: one for navigation, one for collision avoidance, and one for recovery behavior. The selected algorithms dictate how the in-game robot navigates a dynamic environment filled with obstacles and hazards. The goal is to complete the stage within a set limit of recovery attempts and/or by beating the best time, with leaderboards to compare performances.
+Nav Card is a 2D strategy game that combines card selection with algorithmic robot navigation. Players select three cards before starting each level: one for navigation, one for obstacle avoidance, and one for recovery behavior. The chosen algorithms determine how the robot navigates through environments with various obstacles and hazards. The goal is to complete levels within a specified number of recovery attempts and/or achieve the best time, with a leaderboard for comparing performance.
 
-For a more detailed project description, check out our [DESCRIPTION.md](DESCRIPTION.md) file.
+For more project details, see the [DESCRIPTION.md](DESCRIPTION.md) file.
 
 ## Game Screenshots
 
-### Card Selection View
-![Card Selection View](screenshots/gameplay/normal_stage.png)
+### Gameplay View
+![Card Selection View](screenshots/gameplay/gameplay.png)
 
 ### Fan-out Display Mode
 ![Fan-out Display Mode](screenshots/gameplay/fanout.png)
 
-### Game Stage View
-![Game Stage View](screenshots/gameplay/slice_up.png)
+### Card Placement View
+![Game Stage View](screenshots/gameplay/gameplay2.png)
+
+### Statistics
+![Game Stage View](screenshots/data/Data_Visulize.png)
+
+### Statistics
+![Game Stage View](screenshots/data/Data_Visulize3.png)
+
+### Statistics
+![Game Stage View](screenshots/data/Data_Visulize2.png)
 
 ## Game Mechanics
-- At the start of each stage, players select one card each for navigation, collision avoidance, and recovery behavior.
-- The robot navigates a 2D map filled with static and dynamic obstacles based on the selected algorithms.
-- The stage is completed by reaching the goal while minimizing recovery attempts and finishing within the best possible time.
-- Once the game starts, all UI buttons disappear to provide a cleaner interface, with algorithm execution handled via keyboard controls.
+- At the start of each level, players select one card each for navigation, obstacle avoidance, and recovery behavior
+- The robot navigates a 2D map filled with both static and movable obstacles according to the chosen algorithms
+- Levels are completed by reaching the goal using the minimum number of recoveries and achieving the best time
+- When the game starts, all UI buttons disappear for a cleaner interface, with algorithm operations controlled via keyboard
 
 ## Game Objectives
-- Complete stages within a predefined recovery limit.
-- Beat the record times of previous attempts and other players.
+- Complete levels within the specified number of recovery attempts
+- Beat time records of previous attempts and other players
 
 ## Key Features
-1. **Card-Based Algorithm Selection**: Instead of preset robot behaviors, players choose and tweak algorithm cards, adding strategic depth.
-2. **Data Analytics Integration**: Detailed statistical tracking of player performance (e.g., movement efficiency, recovery attempts) allows for in-depth analysis and feedback.
-3. **Dynamic Environments**: Levels feature dynamically changing obstacles, making real-time algorithm adjustments critical.
-4. **Interactive Leaderboards**: Players can compare performance metrics globally, encouraging continual optimization of their algorithm strategies.
-5. **Clean UI Design**: During gameplay, all UI buttons are hidden to provide an unobstructed view of the algorithm execution.
-6. **Singleton Pattern Implementation**: Game state management utilizes the Singleton design pattern to ensure consistent state across all game components.
+1. **Algorithm Selection via Cards**: Instead of predefined robot behaviors, players can select and customize algorithm cards, adding strategic depth
+2. **Data Analytics Integration**: Detailed tracking of player performance statistics (e.g., movement efficiency, recovery counts) for analysis and in-depth feedback
+3. **Dynamic Environments**: Levels feature dynamically changing obstacles, making real-time algorithm adjustments crucial
+4. **Interactive Leaderboards**: Players can compare performance metrics globally, encouraging continuous improvement of algorithm strategies
+5. **Clean UI Design**: During gameplay, all UI buttons are hidden for an unobstructed view of algorithm operations
+6. **Singleton Pattern Usage**: Game state management uses the Singleton pattern to ensure consistent state across all game components
+7. **Login System**: Players can create profiles and store progress, including cards unlocked at different levels
+8. **Statistics and Analytics System**: Records and analyzes gameplay data to show performance and gameplay trends
 
 ## Project Architecture
 
@@ -40,9 +51,16 @@ For a more detailed project description, check out our [DESCRIPTION.md](DESCRIPT
 ```mermaid
 classDiagram
     class GameManager {
+        -window_width: int
+        -window_height: int
+        -screen: Surface
+        -game_state: GameState
+        -statistics: Statistics
+        -player_data: PlayerData
+        -login_screen: LoginScreen
         -stage: Stage
         -card_deck: CardDeck
-        -game_state: GameState
+        -costmap: Costmap
         -camera_y: float
         -running: boolean
         +run()
@@ -52,61 +70,76 @@ classDiagram
         +reset_game()
         +start_game()
         +run_algorithm()
+        +handle_button_action(action)
+        +load_map()
+        +load_current_level_map()
     }
     
     class CardDeck {
         -cards: List~Card~
+        -placed_cards: dict
+        -stage: Stage
         -preview_mode: boolean
-        -game_stage: boolean
-        +reset_cards()
-        +handle_events()
+        -in_game_stage: boolean
+        -game_state: GameState
+        +reset()
+        +handle_events(events)
         +update()
-        +draw()
-        +set_game_stage()
-        +toggle_preview_mode()
+        +draw(screen, camera_offset)
+        +reset_cards()
+        +update_available_cards()
+        +set_game_stage(is_in_game_stage)
     }
     
     class Card {
         -card_type: string
         -card_name: string
         -position: tuple
+        -original_position: tuple
+        -image: Surface
+        -shadow: Surface
         -dragging: boolean
         -hovering: boolean
         -in_preview: boolean
-        +draw()
-        +update_dragging()
-        +contains_point()
-        +set_preview_mode()
-        +start_dragging()
-        +stop_dragging()
+        -current_area: string
+        +draw(surface)
+        +update_dragging(mouse_pos)
+        +contains_point(point)
+        +set_preview_mode(index, total_cards)
+        +exit_preview_mode()
+        +start_dragging(mouse_pos)
+        +stop_dragging(reset_position)
+        +update()
     }
     
     class CardType {
         <<enumeration>>
         NAVIGATION
         COLLISION_AVOIDANCE
-        RECOVERY
+        RECOVERY_BEHAVIOR
     }
     
     class Stage {
         -slots: List~CardSlot~
         -buttons: List~Button~
         -background: Surface
-        +draw()
-        +handle_mouse_motion()
-        +place_card()
-        +handle_button_click()
-        +get_slot_at_position()
-        +set_run_button_visible()
+        +draw(screen, dragging_card, camera_offset)
+        +handle_mouse_motion(mouse_pos)
+        +handle_button_click(mouse_pos)
+        +place_card(card, position, camera_offset)
+        +get_slot_at_position(pos)
+        +get_selected_algorithm()
+        +run_algorithm(costmap, statistics)
     }
     
     class CardSlot {
         -position: tuple
         -card_type: CardType
         -card: Card
-        +draw()
-        +can_accept_card()
-        +place_card()
+        -is_highlighted: boolean
+        +draw(surface, camera_offset)
+        +can_accept_card(card)
+        +place_card(card)
         +remove_card()
     }
     
@@ -115,86 +148,176 @@ classDiagram
         -image: Surface
         -action_name: string
         -is_visible: boolean
-        +draw()
-        +check_hover()
-        +is_clicked()
-        +set_visible()
+        -is_hovered: boolean
+        -is_level_button: boolean
+        +draw(screen, camera_offset)
+        +check_hover(mouse_pos)
+        +is_clicked(mouse_pos)
+        +set_visible(visible)
     }
     
     class GameState {
         -current_state: string
+        -current_level: int
+        -highest_completed_level: int
+        -unlocked_cards: dict
+        -username: string
         -_instance: GameState$
-        +get_instance()$
-        +update()
-        +change_state()
-        -_handle_playing()
-        -_handle_paused()
-        -_handle_game_over()
+        +change_state(new_state)
+        +get_state()
+        +advance_level()
+        +get_unlocked_cards()
+        +get_current_level()
+        +set_username(username)
+        +get_username()
+    }
+    
+    class GameStateEnum {
+        <<enumeration>>
+        LOGIN
+        CARD_CHOOSING
+        PLAYING
+        FINISH
+        PAUSE
+    }
+    
+    class Statistics {
+        -username: string
+        -start_time: float
+        -end_time: float
+        -elapsed_time: float
+        -current_level: int
+        -robot_positions: List~tuple~
+        -recovery_attempts: int
+        -completion_success: boolean
+        -_instance: Statistics$
+        +set_username(username)
+        +set_level(level)
+        +start_timer()
+        +stop_timer(pause)
+        +add_robot_position(x, y)
+        +increment_recovery_attempts()
+        +save_completion_data()
+        +save_robot_positions()
+        +save_recovery_data()
+        +save_all_data()
+    }
+    
+    class LoginScreen {
+        -window_width: int
+        -window_height: int
+        -username_input: TextInput
+        -login_button: Button
+        -is_returning_player: boolean
+        +handle_events(events)
+        +draw(screen)
+        +get_username()
+    }
+    
+    class PlayerData {
+        -data_folder: string
+        +save_player_data(username, data)
+        +load_player_data(username)
+        +player_exists(username)
+        +get_all_players()
+    }
+    
+    class Costmap {
+        -rect_width: int
+        -rect_height: int
+        -resolution: int
+        -grid: array
+        -start_pos: tuple
+        -goal_pos: tuple
+        +set_obstacle(x, y, value)
+        +get_value(x, y)
+        +draw(surface)
+        +load_from_pgm(file_path)
+        +set_start_position(x, y)
+        +set_goal_position(x, y)
     }
     
     GameManager --> Stage : manages
     GameManager --> CardDeck : contains
     GameManager --> GameState : uses
+    GameManager --> Statistics : uses
+    GameManager --> PlayerData : uses
+    GameManager --> LoginScreen : contains
+    GameManager --> Costmap : contains
     
     Stage --> CardSlot : contains
     Stage --> Button : contains
     
     CardDeck --> Card : contains
+    CardDeck --> GameState : uses
     
     CardSlot --> Card : can hold
     CardSlot --> CardType : accepts type
     
     Card ..> CardType : has type
     
-    note for GameState "Singleton Pattern"
+    Statistics ..> PlayerData : uses
+    
+    GameState ..> GameStateEnum : uses
+    
+    note for GameState "Uses Singleton Pattern"
+    note for Statistics "Uses Singleton Pattern"
 ```
 
 ## Algorithm Cards
-The game includes various algorithm cards that players can choose from:
+The game features a variety of algorithm cards that players can choose from:
 
 ### Navigation Algorithms
-- **A*** - An efficient pathfinding algorithm that uses heuristics to find the shortest path
-- **Dijkstra** - A classic pathfinding algorithm that guarantees the shortest path
-- **RRT (Rapidly-exploring Random Tree)** - A randomized algorithm for efficient space exploration
-- **Greedy Search** - A fast but potentially suboptimal pathfinding approach
+- **DFS (Depth-First Search)** - Explores as far as possible along a branch before backtracking
+- **BFS (Breadth-First Search)** - Explores all paths at equal distance from the starting point
+- **A*** - Efficient search algorithm that uses heuristics to find the shortest path
+- **Dijkstra** - Classic pathfinding algorithm that guarantees the shortest path
+- **RRT (Rapidly-exploring Random Tree)** - Randomized algorithm for efficient space exploration
 
 ### Collision Avoidance Algorithms
 - **DWA (Dynamic Window Approach)** - Considers robot dynamics for smooth obstacle avoidance
-- **Wall Following** - A simple algorithm that follows walls to navigate around obstacles
+- **VFH (Vector Field Histogram)** - Uses a two-dimensional histogram of obstacles for efficient avoidance
+- **BUG** - Simple algorithm that runs in a straight line to the goal and turns when encountering obstacles
+- **Wall Following** - Simple algorithm that follows walls to navigate around obstacles
 
 ### Recovery Behaviors
-- Various strategies for recovering from stuck situations or collisions
+- **SpinInPlace** - Spins in place to find a clear path
+- **StepBack** - Steps backward before trying another path
 
 ## Design Patterns
-The game implements several design patterns to ensure clean architecture and maintainable code:
+This game utilizes several design patterns to ensure a clean architecture and maintainable code:
 
-1. **Singleton Pattern**: Used for the GameState class to ensure only one instance exists throughout the application, maintaining a consistent game state.
-2. **Observer Pattern**: Used for event handling and user interactions, allowing different components to react to changes in the game state.
+1. **Singleton Pattern**: Used for the GameState class to ensure only one instance throughout the application, maintaining consistent game state management
+2. **Observer Pattern**: Used for event handling and user interactions, allowing components to respond to changes in game state
 
-## Statistical Data Tracking
-The game tracks the following features during gameplay:
-1. **Robot Position Tracking**: Records x-y coordinates and the distance traveled over time.
-2. **Recovery Attempts**: Records each time a recovery maneuver is executed.
-3. **Stage Completion Time**: Total time taken to finish each stage.
-4. **Player Score/Time Records**: Tracking performance metrics to compare against leaderboards.
-5. **Obstacle Interactions**: Records collision counts or interactions with obstacles.
+## Statistical Tracking
+The game tracks the following metrics during gameplay:
+1. **Robot Position Tracking**: Records x-y coordinates and distance traveled over time
+2. **Recovery Attempts**: Logs each time a recovery action is executed
+3. **Level Completion Time**: Total time taken to complete each level
+4. **Player Score/Time Records**: Tracks performance metrics for comparison against leaderboards
+5. **Obstacle Interactions**: Records number of collisions or interactions with obstacles
 
 ## Installation and Usage
 1. Clone or download this repository
-2. Install the required libraries by running `pip install -r requirements.txt`
+2. Install required libraries by running `pip install -r requirements.txt`
 3. Start the game by running `python main.py`
 
 ## Controls
 - **Spacebar**: Toggle card view mode
 - **Left Click**: Select and place cards
-- **Start Button**: Begin the simulation once cards are placed
-- **Reset Button**: Reset the game state to select cards again
-- **'o' Key**: Run the algorithm after the game has started
-- **'r' Key**: Switch to robot placement mode
-- **'g' Key**: Switch to goal placement mode
+- **Start Button**: Begin simulation once cards are placed
+- **Reset Button**: Reset game state to select cards again
+- **ESC**: Pause game/resume playing
 
 ## Development
-This project is developed using Python and Pygame. The system features a card-based interface for algorithm selection, with a clean UI design that hides UI elements during gameplay for better focus on algorithm execution.
+This project was developed using Python and Pygame. The system features a card-based interface for algorithm selection, with a clean UI design that hides UI elements during gameplay for better focus on algorithm operation.
 
-## Current Version
-This is version 0.75 of the project, representing 75% completion of the planned features. Recent additions include implementing the Singleton pattern for game state management and improving the UI by hiding buttons during gameplay.
+## Copyright and License
+The Nav Card project is licensed under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for more details.
+
+## Version
+**Version:** 1.0
+
+## Author
+Napat Sirichan (6710545571)
