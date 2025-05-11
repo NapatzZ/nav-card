@@ -652,7 +652,7 @@ class GameManager:
                 return
                 
             print("--------------------------------------------")
-            print(f"กำลังรันอัลกอริทึม {algorithm_name}, กรุณารอสักครู่...")
+            print(f"Running algorithm {algorithm_name}, please wait...")
             print("--------------------------------------------")
             
         except Exception as e:
@@ -1341,15 +1341,15 @@ class GameManager:
         """แสดงข้อความเตือนว่าหุ่นยนต์ถูก reset"""
         # Create overlay for warning message
         overlay = pygame.Surface((self.window_width, self.window_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 180))  # Transparent black background (เพิ่มความทึบให้มากขึ้น)
+        overlay.fill((0, 0, 0, 180))  # Transparent black background
         self.screen.blit(overlay, (0, 0))
         
         # Create warning message
-        warning_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 42)  # เพิ่มขนาดตัวอักษร
-        title_text = warning_font.render("การทำงานถูกขัดจังหวะ!", True, (255, 50, 50))  # สีแดงสำหรับข้อความหลัก
+        warning_font = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 42)
+        title_text = warning_font.render("Operation Interrupted!", True, (255, 50, 50))  # Red for main message
         
-        warning_text = warning_font.render("หุ่นยนต์กำลังถูก Reset", True, (255, 255, 0))
-        sub_text = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 30).render("กำลังกลับไปยังตำแหน่งเริ่มต้นของแมพนี้...", True, (255, 255, 255))
+        warning_text = warning_font.render("Robot is being reset", True, (255, 255, 0))
+        sub_text = pygame.font.Font("font/PixelifySans-SemiBold.ttf", 30).render("Returning to initial position of this map...", True, (255, 255, 255))
         
         # Position and display warning
         title_rect = title_text.get_rect(centerx=self.window_width // 2, centery=self.window_height // 2 - 80)
@@ -1362,7 +1362,7 @@ class GameManager:
         pygame.display.flip()
         
         # Pause briefly to make sure user sees the message
-        pygame.time.delay(1500)  # เพิ่มเวลาเป็น 1.5 วินาที
+        pygame.time.delay(1500)  # 1.5 seconds
 
     def __check_and_reset_robot_position(self):
         """

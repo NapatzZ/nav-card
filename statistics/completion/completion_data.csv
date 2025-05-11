@@ -3,3 +3,4 @@ timestamp,username,level,attempt,algorithm_name,algorithm_type,time_seconds,time
 2025-05-11 15:21:48,Ulike,1,1,DFS,Navigation,43.86,00:43.860,1,0,0
 2025-05-11 19:48:00,joshWbush,1,1,DFS,Navigation,10.203,00:10.202,1,0,0
 2025-05-11 19:51:30,kendo,1,1,DFS,Navigation,10.157,00:10.157,1,0,0
+2025-05-11 19:55:14,popup,1,1,DFS,Navigation,10.179,00:10.179,1,0,0
