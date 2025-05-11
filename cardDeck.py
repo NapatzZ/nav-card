@@ -331,8 +331,13 @@ class CardDeck:
                     # Stop dragging without resetting position (card will be in placed area)
                     card.stop_dragging(reset_position=False)
                 else:
-                    # Stop dragging and reset position (card will go back to original)
+                    # Stop dragging and return card to deck instead of original position
                     card.stop_dragging(reset_position=True)
+                    # เซ็ตพื้นที่ของการ์ดเป็น "deck"
+                    card.current_area = "deck"
+                    # เซ็ตตำแหน่งให้เป็นตำแหน่งดั้งเดิม
+                    card.position = card.original_position
+                    card.rect.center = card.position
                 
                 # Return hovering
                 card.hovering_area = None
