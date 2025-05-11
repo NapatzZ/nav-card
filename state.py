@@ -46,7 +46,7 @@ class GameState:
                 4: [{"type": "Collision avoidance", "name": "VFH"}],
                 5: [{"type": "Navigation", "name": "Dijkstra"}],
                 6: [{"type": "Navigation", "name": "AStar"}],
-                7: [{"type": "Collision avoidance", "name": "Bug"}],
+                7: [{"type": "Collision avoidance", "name": "BUG"}],
                 8: [{"type": "Navigation", "name": "RRT"}],
                 9: [],
                 10: [],

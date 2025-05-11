@@ -362,7 +362,7 @@ class Stage:
         # Create buttons
         reset_button = Button(reset_pos, "assets/reset_button.png", "reset")
         start_button = Button(start_pos, "assets/start_button.png", "start")
-        stat_button = Button(stat_pos, "assets/start_button.png", "stat")  # ใช้รูปเดียวกับ start ก่อน
+        stat_button = Button(stat_pos, "assets/stat_button.png", "stat")  # ใช้รูป stat_button.png
         
         # Level change buttons - ตรวจสอบว่าปุ่มซ้ายใช้รูป left และปุ่มขวาใช้รูป right
         left_button = Button(left_button_pos, "assets/leftValid.png", "prev_level_valid")

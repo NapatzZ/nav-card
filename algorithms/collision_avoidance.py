@@ -395,6 +395,6 @@ class VFHAlgorithm(BaseAlgorithm):
 
 # Dictionary mapping card names to algorithm classes
 COLLISION_AVOIDANCE_ALGORITHMS = {
-    'Bug': BugAlgorithm,
+    'BUG': BugAlgorithm,
     'VFH': VFHAlgorithm
 } 

@@ -144,7 +144,7 @@ class Config:
         """Get valid card names for each type."""
         return {
             "Navigation": ["DFS", "BFS", "Dijkstra", "AStar", "RRT"],
-            "Collision avoidance": ["VFH", "Bug"],
+            "Collision avoidance": ["VFH", "BUG"],
             "Recovery": ["SpinInPlace", "StepBack"]
         }
     

@@ -351,6 +351,10 @@ class GameManager:
                 # Go to previous level
                 self.go_to_previous_level()
             
+            elif action == "stat":
+                # Handle stat button click (for now, just pass)
+                pass
+            
             # After handling button action, update button visibility
             self.update_level_buttons()
             
@@ -1104,7 +1108,7 @@ class GameManager:
                 },
                 "Collision avoidance": {
                     "VFH": "Vector Field Histogram: Avoids obstacles using local environment representation.",
-                    "Bug": "Bug Algorithm: Simple approach that follows obstacles until path is clear."
+                    "BUG": "Bug Algorithm: Simple approach that follows obstacles until path is clear."
                 },
                 "Recovery": {
                     "SpinInPlace": "Spin In Place: Rotates in place to find a new valid path.",
