@@ -37,6 +37,7 @@ class Statistics:
         self.end_time = 0
         self.elapsed_time = 0
         self.is_timing = False
+        self.time_limit = 300  # เวลาจำกัดเริ่มต้น 5 นาที (300 วินาที)
         
         # Level data
         self.current_level = 0
@@ -513,3 +514,22 @@ class Statistics:
                 data[username][level].append((attempt, time_seconds))
         
         return data
+    
+    def set_time_limit(self, seconds):
+        """
+        ตั้งค่าเวลาจำกัดสำหรับด่านปัจจุบัน
+        
+        Args:
+            seconds (int): เวลาจำกัดในหน่วยวินาที
+        """
+        self.time_limit = seconds
+        print(f"[Statistics] Set time limit to {seconds} seconds")
+        
+    def get_time_limit(self):
+        """
+        รับค่าเวลาจำกัดสำหรับด่านปัจจุบัน
+        
+        Returns:
+            int: เวลาจำกัดในหน่วยวินาที
+        """
+        return self.time_limit

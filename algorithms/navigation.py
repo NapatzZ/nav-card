@@ -377,6 +377,21 @@ class RRTAlgorithm(BaseAlgorithm):
         new_node['cost'] = min_cost
         return new_node
     
+    def _distance(self, pos1, pos2):
+        """
+        Calculate distance between positions.
+        
+        Args:
+            pos1 (tuple): First position (row, col)
+            pos2 (tuple): Second position (row, col)
+            
+        Returns:
+            float: Euclidean distance between positions
+        """
+        row1, col1 = pos1
+        row2, col2 = pos2
+        return math.sqrt((row1 - row2)**2 + (col1 - col2)**2)
+    
     def _rewire(self, new_node, neighbors):
         """Rewire the tree by checking if any neighbor should adopt the new node as a parent."""
         for neighbor in neighbors:

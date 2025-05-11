@@ -119,7 +119,7 @@ class LoginScreen:
         
         # Calculate popup dimensions
         self.popup_width = 500
-        self.popup_height = 350  # เพิ่มความสูงเพื่อแสดงข้อความเพิ่มเติม
+        self.popup_height = 350  # Increased height for additional text
         self.popup_x = (screen_width - self.popup_width) // 2
         self.popup_y = (screen_height - self.popup_height) // 2
         
@@ -134,7 +134,7 @@ class LoginScreen:
         self.button_width = 150
         self.button_height = 50
         self.button_x = self.popup_x + (self.popup_width - self.button_width) // 2
-        self.button_y = self.popup_y + 250  # ปรับตำแหน่งปุ่มลงมา
+        self.button_y = self.popup_y + 250  # Adjusted button position down
         self.button_rect = pygame.Rect(self.button_x, self.button_y, self.button_width, self.button_height)
         self.button_color = pygame.Color(100, 180, 100)  # Green
         self.button_hover_color = pygame.Color(120, 200, 120)  # Lighter green
@@ -171,19 +171,19 @@ class LoginScreen:
             if event.type == pygame.MOUSEMOTION:
                 self.button_is_hovered = self.button_rect.collidepoint(event.pos)
             
-            # ตรวจสอบผู้เล่นเก่าทันทีที่พิมพ์ชื่อ
+            # Check for returning player immediately when typing
             if event.type == pygame.KEYUP and self.text_input.active:
                 self._check_returning_player()
                 
         return False
         
     def _check_returning_player(self):
-        """ตรวจสอบว่าผู้เล่นเคยอยู่ในระบบหรือไม่"""
+        """Check if player already exists in the system"""
         username = self.text_input.text
         if len(username) >= 3 and self.player_data.player_exists(username):
             self.is_returning_player = True
             
-            # อ่านข้อมูลผู้เล่นเพื่อแสดงผล
+            # Read player data to display information
             player_file = self.player_data.get_player_file_path(username)
             try:
                 import json
@@ -196,9 +196,9 @@ class LoginScreen:
                     for card_type, cards in player_data.get("unlocked_cards", {}).items():
                         unlocked_cards += len(cards)
                         
-                    self.returning_player_info = f"ระดับ: {level}, ด่านสูงสุด: {highest_level}, การ์ดที่ปลดล็อก: {unlocked_cards}"
+                    self.returning_player_info = f"Level: {level}, Highest level: {highest_level}, Unlocked cards: {unlocked_cards}"
             except:
-                self.returning_player_info = "พบข้อมูลผู้เล่น (ไม่สามารถอ่านรายละเอียดได้)"
+                self.returning_player_info = "Player data found (unable to read details)"
         else:
             self.is_returning_player = False
             self.returning_player_info = ""
@@ -214,7 +214,7 @@ class LoginScreen:
             self.username = self.text_input.text
             self.active = False
             
-            # ถ้ามีผู้เล่นในระบบอยู่แล้ว ให้โหลดข้อมูล
+            # If player exists, load their data
             if self.player_data.player_exists(self.username):
                 self.player_data.load_player_data(self.username)
                 print(f"[LoginScreen] Welcome back, {self.username}!")
@@ -261,9 +261,9 @@ class LoginScreen:
         # Draw text input
         self.text_input.draw(screen)
         
-        # แสดงข้อความสำหรับผู้เล่นเก่า
+        # Display returning player message
         if self.is_returning_player:
-            welcome_text = self.info_font.render("ยินดีต้อนรับกลับ! ข้อมูลของคุณจะถูกโหลดอัตโนมัติ", True, (100, 255, 100))
+            welcome_text = self.info_font.render("Welcome back! Your data will be loaded automatically", True, (100, 255, 100))
             welcome_rect = welcome_text.get_rect(centerx=self.popup_x + self.popup_width // 2, y=self.popup_y + 190)
             screen.blit(welcome_text, welcome_rect)
             
