@@ -352,6 +352,7 @@ class Stage:
         # Calculate button positions
         reset_pos = (Config.BOARD_WIDTH // 4, Config.BOARD_HEIGHT - 80)
         start_pos = (Config.BOARD_WIDTH * 2 // 4, Config.BOARD_HEIGHT - 80)
+        stat_pos = (Config.BOARD_WIDTH * 3 // 4, Config.BOARD_HEIGHT - 80)  # ตำแหน่งปุ่ม stat ที่อยู่ถัดจากปุ่ม start
         
         # Position of level change buttons at the top of the screen
         # ตำแหน่งเดิม: left_button_pos = (80, 100), right_button_pos = (Config.BOARD_WIDTH - 80, 100)
@@ -361,6 +362,7 @@ class Stage:
         # Create buttons
         reset_button = Button(reset_pos, "assets/reset_button.png", "reset")
         start_button = Button(start_pos, "assets/start_button.png", "start")
+        stat_button = Button(stat_pos, "assets/start_button.png", "stat")  # ใช้รูปเดียวกับ start ก่อน
         
         # Level change buttons - ตรวจสอบว่าปุ่มซ้ายใช้รูป left และปุ่มขวาใช้รูป right
         left_button = Button(left_button_pos, "assets/leftValid.png", "prev_level_valid")
@@ -380,6 +382,7 @@ class Stage:
         
         buttons.append(reset_button)
         buttons.append(start_button)
+        buttons.append(stat_button)
         buttons.append(left_button)
         buttons.append(left_invalid_button)
         buttons.append(right_button)
