@@ -802,8 +802,15 @@ class GameManager:
             rect_width = rect_end[0] - rect_start[0]
             rect_height = rect_end[1] - rect_start[1]
             
-            # Draw costmap inside the rectangle
-            self.costmap.draw(self.screen, rect_start)
+            # สร้าง surface ชั่วคราวสำหรับวาดแผนที่
+            map_surface = pygame.Surface((rect_width, rect_height), pygame.SRCALPHA)
+            map_surface.fill((0, 0, 0, 0))  # ทำให้โปร่งใสทั้งหมด
+            
+            # วาดแผนที่ลงบน surface ชั่วคราว (ปรับตำแหน่งให้เป็น 0,0)
+            self.costmap.draw(map_surface, (0, 0))
+            
+            # นำแผนที่ไปวาดบนหน้าจอหลัก ตามตำแหน่งที่ต้องการ
+            self.screen.blit(map_surface, rect_start)
             
             # Draw border in white, 3 pixels thick
             pygame.draw.rect(

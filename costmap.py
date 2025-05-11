@@ -229,6 +229,7 @@ class Costmap:
                     if len(pos) == 2:  # Safety check
                         row, col = pos
                         if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
+                            # ตรวจสอบว่าเซลล์อยู่ในขอบเขตของแผนที่หรือไม่
                             path_rect = (
                                 x_offset + col * self.actual_resolution_x + self.actual_resolution_x // 4,
                                 y_offset + row * self.actual_resolution_y + self.actual_resolution_y // 4,
@@ -241,6 +242,7 @@ class Costmap:
             if self.robot_pos and len(self.robot_pos) == 2:
                 row, col = self.robot_pos
                 if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
+                    # ตรวจสอบว่าหุ่นยนต์อยู่ในขอบเขตของแผนที่หรือไม่
                     robot_rect = (
                         x_offset + col * self.actual_resolution_x + self.actual_resolution_x // 4,
                         y_offset + row * self.actual_resolution_y + self.actual_resolution_y // 4,
@@ -253,6 +255,7 @@ class Costmap:
             if self.goal_pos and len(self.goal_pos) == 2:
                 row, col = self.goal_pos
                 if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
+                    # ตรวจสอบว่าเป้าหมายอยู่ในขอบเขตของแผนที่หรือไม่
                     goal_rect = (
                         x_offset + col * self.actual_resolution_x + self.actual_resolution_x // 4,
                         y_offset + row * self.actual_resolution_y + self.actual_resolution_y // 4,
