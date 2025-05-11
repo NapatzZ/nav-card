@@ -335,124 +335,109 @@ class Costmap:
             print(f"Error in reset_demo_map: {e}")
             # Continue without crashing
 
-    def load_pgm_map(self, filepath):
+    def load_pgm_map(self, pgm_path):
         """Load a map from a PGM file.
         
         Args:
-            filepath (str): Path to the PGM file
+            pgm_path (str): Path to the PGM file
             
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if map was loaded successfully, False otherwise
         """
         try:
-            if not os.path.exists(filepath):
-                print(f"Error: PGM file not found at {filepath}")
-                return False
+            # Read the PGM file
+            with open(pgm_path, 'rb') as f:
+                # Read the header (P5 for grayscale PGM)
+                header = f.readline().decode('utf-8').strip()
                 
-            with open(filepath, 'rb') as f:
-                # Read header
-                magic_number = f.readline().decode('ascii').strip()
-                if magic_number != "P5":  # Binary PGM format
-                    print(f"Error: Unsupported PGM format {magic_number}, expected P5")
+                if header != 'P5':
+                    print(f"Error: {pgm_path} is not a valid PGM file (expected P5 header)")
                     return False
                 
-                # Skip comments
-                line = f.readline().decode('ascii').strip()
+                # Skip comment lines
+                line = f.readline().decode('utf-8').strip()
                 while line.startswith('#'):
-                    line = f.readline().decode('ascii').strip()
+                    line = f.readline().decode('utf-8').strip()
                 
-                # Read width and height
-                width, height = map(int, line.split())
+                # Parse width and height
+                width, height = [int(x) for x in line.split()]
                 
-                # Read max value
-                max_val = int(f.readline().decode('ascii').strip())
+                # Read max value (for grayscale)
+                max_val = int(f.readline().decode('utf-8').strip())
                 
-                # Read binary data
+                # Read pixel data
                 data = f.read()
                 
-                # Convert binary data to numpy array
+                # Convert data to numpy array
                 if max_val <= 255:
-                    # 8-bit PGM
-                    img_array = np.frombuffer(data, dtype=np.uint8).reshape((height, width))
+                    # 8-bit grayscale
+                    array = np.frombuffer(data, dtype=np.uint8).reshape(height, width)
                 else:
-                    # 16-bit PGM
-                    img_array = np.frombuffer(data, dtype=np.uint16).reshape((height, width))
+                    # 16-bit grayscale (rare)
+                    array = np.frombuffer(data, dtype=np.uint16).reshape(height, width)
                 
-                # Resize to fit our grid dimensions
-                self.clear_grid()
+                # Convert to binary matrix (0 for free space, 1 for obstacles)
+                # Assume that darker values (lower values) are obstacles
+                threshold = max_val // 2
+                binary_array = (array < threshold).astype(np.uint8)
                 
-                # Calculate scaling factors - ensure we use the entire PGM image
-                scale_y = height / self.grid_height
-                scale_x = width / self.grid_width
+                # Resize array to match our grid dimensions if necessary
+                if binary_array.shape != (self.grid_height, self.grid_width):
+                    print(f"Warning: Resizing map from {binary_array.shape} to {(self.grid_height, self.grid_width)}")
+                    from scipy.ndimage import zoom
+                    zoom_factors = (self.grid_height / binary_array.shape[0], 
+                                    self.grid_width / binary_array.shape[1])
+                    binary_array = zoom(binary_array, zoom_factors, order=0)
+                    binary_array = (binary_array > 0.5).astype(np.uint8)  # Re-threshold after zoom
                 
-                # Map PGM to our grid
-                # In PGM, 0 is black (occupied) and max_val is white (free)
-                # We need to threshold and invert: 0=free, 1=occupied
-                threshold = max_val / 2
+                # Update the grid
+                self.grid = binary_array
                 
-                for grid_row in range(self.grid_height):
-                    for grid_col in range(self.grid_width):
-                        # Find corresponding pixel in PGM
-                        pgm_row = min(height - 1, int(grid_row * scale_y))
-                        pgm_col = min(width - 1, int(grid_col * scale_x))
-                        
-                        # Set cell: If PGM value is below threshold, mark as occupied
-                        if img_array[pgm_row, pgm_col] < threshold:
-                            self.set_cell(grid_row, grid_col, 1)  # Occupied
-                        else:
-                            self.set_cell(grid_row, grid_col, 0)  # Free
+                # Automatically set robot and goal positions on free spaces
+                self.set_default_robot_and_goal_positions()
                 
-                # Find suitable starting positions
-                # Look for free space near the bottom left for robot
-                robot_row, robot_col = self._find_free_space_near(self.grid_height * 3//4, self.grid_width//4)
-                self.set_robot_position(robot_row, robot_col)
-                
-                # Look for free space near the top right for goal
-                goal_row, goal_col = self._find_free_space_near(self.grid_height//4, self.grid_width * 3//4)
-                self.set_goal_position(goal_row, goal_col)
-                
+                print(f"Loaded map from {pgm_path} with dimensions {self.grid.shape}")
                 return True
                 
         except Exception as e:
-            print(f"Error loading PGM file: {e}")
+            print(f"Error loading PGM file {pgm_path}: {e}")
             return False
             
-    def _find_free_space_near(self, target_row, target_col, search_radius=10):
-        """Find a free space near the target coordinates.
-        
-        Args:
-            target_row (int): Target row
-            target_col (int): Target column
-            search_radius (int): Radius to search for free space
-            
-        Returns:
-            tuple: (row, col) of a free space near the target
+    def set_default_robot_and_goal_positions(self):
         """
-        # First check if the target itself is free
-        if self.get_cell(target_row, target_col) == 0:
-            return target_row, target_col
+        Automatically set default positions for robot and goal on free spaces.
+        Robot is placed at top-left free cell, goal at bottom-right free cell.
+        """
+        try:
+            # Find a free space for robot (top-left)
+            robot_placed = False
+            for row in range(self.grid_height):
+                if robot_placed:
+                    break
+                for col in range(self.grid_width):
+                    if self.grid[row, col] == 0:  # Free space
+                        self.robot_pos = (row, col)
+                        robot_placed = True
+                        break
             
-        # Search in expanding circles
-        for r in range(1, search_radius + 1):
-            for dr in range(-r, r + 1):
-                for dc in range(-r, r + 1):
-                    # Check only the edge of the circle
-                    if abs(dr) == r or abs(dc) == r:
-                        row = target_row + dr
-                        col = target_col + dc
+            # Find a free space for goal (bottom-right)
+            goal_placed = False
+            for row in range(self.grid_height - 1, -1, -1):
+                if goal_placed:
+                    break
+                for col in range(self.grid_width - 1, -1, -1):
+                    if self.grid[row, col] == 0:  # Free space
+                        self.goal_pos = (row, col)
+                        goal_placed = True
+                        break
                         
-                        if 0 <= row < self.grid_height and 0 <= col < self.grid_width:
-                            if self.get_cell(row, col) == 0:
-                                return row, col
-        
-        # If no free space found, return a fallback position
-        for row in range(self.grid_height):
-            for col in range(self.grid_width):
-                if self.get_cell(row, col) == 0:
-                    return row, col
-                    
-        # Last resort fallback
-        return self.grid_height // 2, self.grid_width // 2
+            if robot_placed and goal_placed:
+                print(f"Set default robot position at {self.robot_pos} and goal at {self.goal_pos}")
+            else:
+                print("Warning: Could not set default positions for robot and/or goal")
+                
+        except Exception as e:
+            print(f"Error setting default positions: {e}")
 
     def reset(self):
         """

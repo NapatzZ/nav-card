@@ -1,5 +1,13 @@
 timestamp,username,level,attempt,algorithm_name,algorithm_type,time_seconds,time_formatted,success,stuck_count,recovery_attempts
-2025-05-11 09:34:06,jonathan,1,1,DFS,Navigation,57.74,00:57.740,1,0,0
-2025-05-11 11:18:51,josh,1,1,DFS,Navigation,57.937,00:57.937,1,0,0
-2025-05-11 12:04:18,ant,1,1,DFS,Navigation,43.863,00:43.862,1,0,0
-2025-05-11 12:04:43,ant,1,1,DFS,Navigation,2.011,00:02.011,1,0,0
+2023-04-23 15:30:45,test_user,1,1,DFS,Navigation,120.5,02:00.500,1,0,0
+2023-04-23 15:45:12,test_user,1,2,DFS,Navigation,95.3,01:35.300,1,0,0
+2023-04-23 16:10:23,test_user,1,3,DFS,Navigation,83.2,01:23.200,1,0,0
+2023-04-23 16:30:10,test_user,2,1,BFS,Navigation,150.7,02:30.700,0,2,1
+2023-04-23 16:45:30,test_user,2,2,BFS,Navigation,130.5,02:10.500,1,1,1
+2023-04-23 17:15:45,test_user,3,1,AStar,Navigation,175.8,02:55.800,0,3,2
+2023-04-23 17:35:20,test_user,3,2,AStar,Navigation,160.4,02:40.400,1,2,1
+2023-04-24 10:15:45,player2,1,1,DFS,Navigation,105.2,01:45.200,1,0,0
+2023-04-24 10:35:12,player2,2,1,BFS,Navigation,142.7,02:22.700,0,2,1
+2023-04-24 11:00:30,player2,2,2,Dijkstra,Navigation,120.3,02:00.300,1,1,0
+2025-05-11 14:27:00,napat,1,1,DFS,Navigation,11.508,00:11.507,1,0,0
+2025-05-11 14:27:19,napat,2,1,BFS,Navigation,12.612,00:12.611,1,0,0

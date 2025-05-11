@@ -279,199 +279,361 @@ class Statistics:
         self.prepare_user_summary_data()
     
     def prepare_heatmap_data(self):
-        """Create data for Heatmap showing robot movement positions"""
+        """
+        Create data for Heatmap showing robot movement positions.
+        
+        Returns:
+            dict: Dictionary containing heatmap data or None if insufficient data
+        """
         heatmap_file = "statistics/visualization/heatmap_data.csv"
         
-        # New file or empty file
+        # Check if file exists
         file_exists = os.path.isfile(heatmap_file) and os.path.getsize(heatmap_file) > 0
         
-        with open(heatmap_file, 'a', newline='') as f:
-            writer = csv.writer(f)
-            
-            # Write header if new file
-            if not file_exists:
+        # Create file if it doesn't exist
+        if not file_exists:
+            with open(heatmap_file, 'w', newline='') as f:
+                writer = csv.writer(f)
                 writer.writerow([
                     'x', 'y', 'frequency', 'username', 'level', 'algorithm', 'success'
                 ])
+        
+        # If current run has positions, add to file
+        if self.robot_positions:
+            with open(heatmap_file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Combine repeated positions and count frequency
+                position_freq = {}
+                for x, y, _ in self.robot_positions:
+                    pos = (x, y)
+                    if pos in position_freq:
+                        position_freq[pos] += 1
+                    else:
+                        position_freq[pos] = 1
+                
+                # Write data to file
+                for pos, freq in position_freq.items():
+                    writer.writerow([
+                        pos[0], pos[1], freq, self.username, self.current_level, 
+                        self.current_algorithm, int(self.completion_success)
+                    ])
+        
+        # Read data from file to create heatmap
+        try:
+            # Get grid size from costmap for proper sizing
+            grid_height = 23  # Default values
+            grid_width = 45
             
-            # Combine repeated positions and count frequency
-            position_freq = {}
-            for x, y, _ in self.robot_positions:
-                pos = (x, y)
-                if pos in position_freq:
-                    position_freq[pos] += 1
-                else:
-                    position_freq[pos] = 1
+            # Create empty heatmap grid
+            heatmap = np.zeros((grid_height, grid_width))
             
-            # Write data to file
-            for pos, freq in position_freq.items():
-                writer.writerow([
-                    pos[0], pos[1], freq, self.username, self.current_level, 
-                    self.current_algorithm, int(self.completion_success)
-                ])
+            # Read position data from file
+            with open(heatmap_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Get position and frequency
+                    x = int(float(row['x']))
+                    y = int(float(row['y']))
+                    freq = int(row['frequency'])
+                    
+                    # Ensure coordinates are within grid bounds
+                    if 0 <= y < grid_height and 0 <= x < grid_width:
+                        heatmap[y, x] += freq
+            
+            # Return None if heatmap is empty
+            if np.sum(heatmap) == 0:
+                return None
+                
+            return {'heatmap': heatmap}
+        except Exception as e:
+            print(f"Error preparing heatmap data: {e}")
+            return None
     
     def prepare_time_vs_attempts_data(self):
-        """Create data for graph showing time used vs number of attempts"""
+        """
+        Create data for graph showing time used vs number of attempts.
+        
+        Returns:
+            dict: Dictionary containing x and y values for plotting or None if insufficient data
+        """
         # Read data from completion_data.csv
         completion_file = "statistics/completion/completion_data.csv"
         time_vs_attempts_file = "statistics/visualization/time_vs_attempts.csv"
         
         if not os.path.isfile(completion_file):
-            return
+            return None
             
         # Prepare data for graph
         data = {}
         
-        with open(completion_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                username = row['username']
-                level = int(row['level'])
-                attempt = int(row['attempt'])
-                time_seconds = float(row['time_seconds'])
-                algorithm = row['algorithm_name']
-                
-                key = (username, level, algorithm)
-                if key not in data:
-                    data[key] = []
-                
-                data[key].append((attempt, time_seconds))
-        
-        # Write data to new file
-        file_exists = os.path.isfile(time_vs_attempts_file)
-        
-        with open(time_vs_attempts_file, 'w', newline='') as f:
-            writer = csv.writer(f)
+        try:
+            with open(completion_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    username = row['username']
+                    level = int(row['level'])
+                    attempt = int(row['attempt'])
+                    time_seconds = float(row['time_seconds'])
+                    algorithm = row['algorithm_name']
+                    
+                    key = (username, level, algorithm)
+                    if key not in data:
+                        data[key] = []
+                    
+                    data[key].append((attempt, time_seconds))
             
-            # Write header
-            writer.writerow([
-                'username', 'level', 'algorithm', 'attempt', 'time_seconds'
-            ])
+            # Write data to new file for future reference
+            with open(time_vs_attempts_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Write header
+                writer.writerow([
+                    'username', 'level', 'algorithm', 'attempt', 'time_seconds'
+                ])
+                
+                # Write data
+                for (username, level, algorithm), attempts in data.items():
+                    for attempt, time_seconds in attempts:
+                        writer.writerow([
+                            username, level, algorithm, attempt, time_seconds
+                        ])
             
-            # Write data
+            # Create plotting data for current user (or first user if no current user)
+            plotting_data = None
+            
+            # First try to get data for current user
             for (username, level, algorithm), attempts in data.items():
-                for attempt, time_seconds in attempts:
-                    writer.writerow([
-                        username, level, algorithm, attempt, time_seconds
-                    ])
+                if username == self.username:
+                    # Sort attempts by attempt number
+                    attempts.sort(key=lambda x: x[0])
+                    plotting_data = {
+                        'x': [a[0] for a in attempts],
+                        'y': [a[1] for a in attempts],
+                        'title': f"Level {level} - {algorithm}",
+                        'username': username
+                    }
+                    break
+            
+            # If no data for current user, use first user's data
+            if plotting_data is None and data:
+                first_key = next(iter(data))
+                attempts = data[first_key]
+                attempts.sort(key=lambda x: x[0])
+                plotting_data = {
+                    'x': [a[0] for a in attempts],
+                    'y': [a[1] for a in attempts],
+                    'title': f"Level {first_key[1]} - {first_key[2]} (User: {first_key[0]})",
+                    'username': first_key[0]
+                }
+            
+            return plotting_data
+        
+        except Exception as e:
+            print(f"Error preparing time vs attempts data: {e}")
+            return None
     
     def prepare_recovery_by_algorithm_data(self):
-        """Create data for graph showing recovery attempts by algorithm used"""
+        """
+        Create data for graph showing recovery attempts by algorithm used.
+        
+        Returns:
+            dict: Dictionary containing algorithms and attempts data for plotting or None if insufficient data
+        """
         recovery_file = "statistics/recovery/recovery_data.csv"
         recovery_by_algorithm_file = "statistics/visualization/recovery_by_algorithm.csv"
         
         if not os.path.isfile(recovery_file):
-            return
+            return None
             
         # Prepare data for graph
         data = {}
         
-        with open(recovery_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                username = row['username']
-                algorithm = row['algorithm_name']
-                algorithm_type = row['algorithm_type']
-                recovery_attempts = int(row['recovery_attempts'])
-                success = int(row['success'])
-                
-                key = (username, algorithm, algorithm_type)
-                if key not in data:
-                    data[key] = {
-                        'total_attempts': 0,
-                        'success_count': 0,
-                        'sessions': 0
-                    }
-                
-                data[key]['total_attempts'] += recovery_attempts
-                data[key]['success_count'] += success
-                data[key]['sessions'] += 1
-        
-        # Write data to new file
-        with open(recovery_by_algorithm_file, 'w', newline='') as f:
-            writer = csv.writer(f)
+        try:
+            with open(recovery_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    username = row['username']
+                    algorithm = row['algorithm_name']
+                    algorithm_type = row['algorithm_type']
+                    recovery_attempts = int(row['recovery_attempts'])
+                    success = int(row['success'])
+                    
+                    # Create unique label for algorithm combination
+                    algorithm_label = f"{algorithm} ({algorithm_type})"
+                    
+                    if algorithm_label not in data:
+                        data[algorithm_label] = {
+                            'total_attempts': 0,
+                            'success_count': 0,
+                            'sessions': 0
+                        }
+                    
+                    data[algorithm_label]['total_attempts'] += recovery_attempts
+                    data[algorithm_label]['success_count'] += success
+                    data[algorithm_label]['sessions'] += 1
             
-            # Write header
-            writer.writerow([
-                'username', 'algorithm', 'algorithm_type', 'total_recovery_attempts', 
-                'success_rate', 'sessions'
-            ])
-            
-            # Write data
-            for (username, algorithm, algorithm_type), stats in data.items():
-                success_rate = (stats['success_count'] / stats['sessions']) * 100 if stats['sessions'] > 0 else 0
+            # Write data to new file for future reference
+            with open(recovery_by_algorithm_file, 'w', newline='') as f:
+                writer = csv.writer(f)
                 
+                # Write header
                 writer.writerow([
-                    username, algorithm, algorithm_type, stats['total_attempts'],
-                    round(success_rate, 2), stats['sessions']
+                    'algorithm_label', 'total_recovery_attempts', 
+                    'success_rate', 'sessions'
                 ])
+                
+                # Write data
+                for algorithm_label, stats in data.items():
+                    success_rate = (stats['success_count'] / stats['sessions']) * 100 if stats['sessions'] > 0 else 0
+                    
+                    writer.writerow([
+                        algorithm_label, stats['total_attempts'],
+                        round(success_rate, 2), stats['sessions']
+                    ])
+            
+            # If we have data, create plotting data
+            if data:
+                # Sort algorithms by total attempts
+                sorted_algorithms = sorted(data.keys(), 
+                                          key=lambda alg: data[alg]['total_attempts'],
+                                          reverse=True)
+                
+                # Calculate average attempts per session
+                avg_attempts = [data[alg]['total_attempts'] / data[alg]['sessions'] 
+                               if data[alg]['sessions'] > 0 else 0 
+                               for alg in sorted_algorithms]
+                
+                plotting_data = {
+                    'algorithms': sorted_algorithms,
+                    'attempts': avg_attempts,
+                    'success_rates': [data[alg]['success_count'] / data[alg]['sessions'] * 100 
+                                     if data[alg]['sessions'] > 0 else 0 
+                                     for alg in sorted_algorithms]
+                }
+                
+                return plotting_data
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error preparing recovery by algorithm data: {e}")
+            return None
     
     def prepare_user_summary_data(self):
-        """Create summary table for all player data"""
+        """
+        Create summary table for all player data.
+        
+        Returns:
+            pandas.DataFrame: DataFrame containing user summary data or None if insufficient data
+        """
         completion_file = "statistics/completion/completion_data.csv"
         user_summary_file = "statistics/visualization/user_summary.csv"
         
         if not os.path.isfile(completion_file):
-            return
+            return None
             
         # Prepare player summary data
         user_data = {}
         
-        with open(completion_file, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                username = row['username']
-                level = int(row['level'])
-                time_seconds = float(row['time_seconds'])
-                success = int(row['success'])
-                
-                if username not in user_data:
-                    user_data[username] = {
-                        'total_plays': 0,
-                        'success_count': 0,
-                        'levels_played': set(),
-                        'best_times': {},  # { level: best_time }
-                        'total_time': 0
-                    }
-                
-                user_data[username]['total_plays'] += 1
-                user_data[username]['success_count'] += success
-                user_data[username]['levels_played'].add(level)
-                user_data[username]['total_time'] += time_seconds
-                
-                # Record best time for each level
-                if success == 1:
-                    if level not in user_data[username]['best_times'] or time_seconds < user_data[username]['best_times'][level]:
-                        user_data[username]['best_times'][level] = time_seconds
-        
-        # Write data to new file
-        with open(user_summary_file, 'w', newline='') as f:
-            writer = csv.writer(f)
+        try:
+            with open(completion_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    username = row['username']
+                    level = int(row['level'])
+                    time_seconds = float(row['time_seconds'])
+                    success = int(row['success'])
+                    algorithm = row['algorithm_name']
+                    recovery_attempts = int(row.get('recovery_attempts', 0))
+                    
+                    if username not in user_data:
+                        user_data[username] = {
+                            'total_plays': 0,
+                            'success_count': 0,
+                            'levels_played': set(),
+                            'best_times': {},  # { level: best_time }
+                            'total_time': 0,
+                            'algorithms_used': set(),
+                            'total_recovery_attempts': 0
+                        }
+                    
+                    user_data[username]['total_plays'] += 1
+                    user_data[username]['success_count'] += success
+                    user_data[username]['levels_played'].add(level)
+                    user_data[username]['total_time'] += time_seconds
+                    user_data[username]['algorithms_used'].add(algorithm)
+                    user_data[username]['total_recovery_attempts'] += recovery_attempts
+                    
+                    # Record best time for each level
+                    if success == 1:
+                        if level not in user_data[username]['best_times'] or time_seconds < user_data[username]['best_times'][level]:
+                            user_data[username]['best_times'][level] = time_seconds
             
-            # Write header
-            writer.writerow([
-                'username', 'total_plays', 'success_count', 'success_rate', 
-                'levels_played', 'average_time', 'best_level_times'
-            ])
+            # Write data to new file for future reference
+            with open(user_summary_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Write header
+                writer.writerow([
+                    'Username', 'Total Plays', 'Success Count', 'Success Rate (%)', 
+                    'Levels Played', 'Avg Time (s)', 'Avg Recovery Attempts',
+                    'Best Level Times'
+                ])
+                
+                # Write data
+                for username, stats in user_data.items():
+                    success_rate = (stats['success_count'] / stats['total_plays'] * 100) if stats['total_plays'] > 0 else 0
+                    average_time = stats['total_time'] / stats['total_plays'] if stats['total_plays'] > 0 else 0
+                    avg_recovery = stats['total_recovery_attempts'] / stats['total_plays'] if stats['total_plays'] > 0 else 0
+                    
+                    # Format best times for each level
+                    best_times_str = "; ".join([f"Level {level}: {self.format_time(time)}" 
+                                              for level, time in stats['best_times'].items()])
+                    
+                    writer.writerow([
+                        username,
+                        stats['total_plays'],
+                        stats['success_count'],
+                        round(success_rate, 2),
+                        ",".join(map(str, sorted(stats['levels_played']))),
+                        round(average_time, 2),
+                        round(avg_recovery, 2),
+                        best_times_str
+                    ])
             
-            # Write data
+            # Convert to pandas DataFrame for analysis
+            import pandas as pd
+            summary_data = []
+            
             for username, stats in user_data.items():
                 success_rate = (stats['success_count'] / stats['total_plays'] * 100) if stats['total_plays'] > 0 else 0
                 average_time = stats['total_time'] / stats['total_plays'] if stats['total_plays'] > 0 else 0
+                avg_recovery = stats['total_recovery_attempts'] / stats['total_plays'] if stats['total_plays'] > 0 else 0
                 
-                # Combine best times for each level
+                # Format best times for each level
                 best_times_str = "; ".join([f"Level {level}: {self.format_time(time)}" 
                                           for level, time in stats['best_times'].items()])
                 
-                writer.writerow([
-                    username,
-                    stats['total_plays'],
-                    stats['success_count'],
-                    round(success_rate, 2),
-                    ",".join(map(str, sorted(stats['levels_played']))),
-                    self.format_time(average_time),
-                    best_times_str
-                ])
+                summary_data.append({
+                    'Username': username,
+                    'Total Plays': stats['total_plays'],
+                    'Success Count': stats['success_count'],
+                    'Success Rate (%)': round(success_rate, 2),
+                    'Levels Played': ",".join(map(str, sorted(stats['levels_played']))),
+                    'Avg Time (s)': round(average_time, 2),
+                    'Avg Recovery Attempts': round(avg_recovery, 2),
+                    'Best Level Times': best_times_str
+                })
+            
+            if summary_data:
+                return pd.DataFrame(summary_data)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error preparing user summary data: {e}")
+            return None
     
     def generate_heatmap_data(self):
         """Generate data for Heatmap"""

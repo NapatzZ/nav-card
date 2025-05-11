@@ -92,57 +92,84 @@ class CardDeck:
         
         # Get current unlocked cards from GameState
         unlocked_cards = self.__game_state.get_unlocked_cards()
+        print(f"[CardDeck] Current unlocked cards from GameState: {unlocked_cards}")
         
         # Keep track of cards already placed on slots
         placed_cards = {area: card for area, card in self.__placed_cards.items() if card is not None}
         print(f"[CardDeck] Found {len(placed_cards)} cards already placed on slots")
         
-        # Clear all current cards
-        old_cards = len(self.__cards)
-        self.__cards = []
+        # Track which cards we'll keep
+        cards_to_keep = []
         
-        # Create cards according to unlocked cards
+        # First, keep all cards that are placed on slots
+        for area, placed_card in placed_cards.items():
+            cards_to_keep.append(placed_card)
+            print(f"[CardDeck] Keeping placed card: {placed_card.card_type} - {placed_card.card_name} in {area}")
+            
+        # Then check which cards to create or keep from deck
         total_new_cards = 0
+        
+        # Check which new cards need to be added and which existing cards to keep
         for card_type, card_names in unlocked_cards.items():
+            print(f"[CardDeck] Processing card type: {card_type} with {len(card_names)} cards")
             for card_name in card_names:
                 # Check if this card is already placed on a slot
                 is_placed = False
-                for area, placed_card in placed_cards.items():
+                for placed_card in cards_to_keep:
                     if placed_card.card_type == card_type and placed_card.card_name == card_name:
-                        # Re-add the card that's already placed
-                        self.__cards.append(placed_card)
                         is_placed = True
-                        print(f"[CardDeck] Re-added placed card: {card_type} - {card_name} in {area}")
                         break
                 
-                # If card is not placed yet, create a new one
+                # Only process cards that aren't already placed
                 if not is_placed:
-                    card = Card(card_type, card_name)
-                    card.current_area = "deck"
-                    self.__cards.append(card)
-                    total_new_cards += 1
-                    print(f"[CardDeck] Added new card: {card_type} - {card_name}")
+                    # Check if this card already exists in the deck
+                    existing_card = None
+                    for card in self.__cards:
+                        if card.card_type == card_type and card.card_name == card_name:
+                            existing_card = card
+                            break
+                    
+                    # If card already exists, keep it
+                    if existing_card:
+                        print(f"[CardDeck] Keeping existing deck card: {card_type} - {card_name}")
+                        cards_to_keep.append(existing_card)
+                    # Otherwise create a new card
+                    else:
+                        print(f"[CardDeck] Creating new card: {card_type} - {card_name}")
+                        new_card = Card(card_type, card_name)
+                        new_card.current_area = "deck"
+                        cards_to_keep.append(new_card)
+                        total_new_cards += 1
+        
+        # Track old card count for debugging
+        old_cards = len(self.__cards)
+        
+        # Replace the cards list with our new list
+        self.__cards = cards_to_keep
         
         print(f"[CardDeck] Updated card deck from {old_cards} to {len(self.__cards)} cards (new: {total_new_cards})")
         
-        # Update placed_cards to point to new card objects
-        updated_placements = 0
+        # Make sure all placed_cards references point to cards in our new list
         for area, old_card in placed_cards.items():
             for card in self.__cards:
                 if (card.card_type == old_card.card_type and 
-                    card.card_name == old_card.card_name and
-                    card.current_area == old_card.current_area):
+                    card.card_name == old_card.card_name):
                     self.__placed_cards[area] = card
-                    updated_placements += 1
                     break
-        
-        print(f"[CardDeck] Updated {updated_placements} card placements")
         
         # Force close preview mode to ensure proper state
         self.__preview_mode = False
         self.__deck_visible = False
         for card in self.__cards:
             card.exit_preview_mode()
+            
+        # Print summary of current deck
+        if total_new_cards > 0:
+            print("[CardDeck] Current deck summary:")
+            for card in self.__cards:
+                print(f"  - {card.card_type}: {card.card_name} (area: {card.current_area})")
+                
+        return total_new_cards > 0  # Return True if new cards were added
     
     def handle_events(self, events):
         """Handle game events related to cards.

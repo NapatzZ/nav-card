@@ -1,0 +1,4 @@
+algorithm_label,total_recovery_attempts,success_rate,sessions
+BFS (Navigation),3,33.33,3
+AStar (Navigation),3,50.0,2
+Dijkstra (Navigation),0,100.0,1

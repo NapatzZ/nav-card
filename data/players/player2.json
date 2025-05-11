@@ -1,0 +1,19 @@
+{
+    "username": "player2",
+    "current_level": 3,
+    "highest_completed_level": 2,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS",
+            "Dijkstra"
+        ],
+        "Collision avoidance": [
+            "VFH"
+        ],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}

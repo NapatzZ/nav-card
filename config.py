@@ -12,6 +12,12 @@ class Config:
     # Debug mode (0 = OFF, 1 = ON)
     DEBUG_MODE = 0  # Set to 0 to disable debug information
     
+    # Log settings
+    LOG_LEVEL = 1  # 0 = None, 1 = Critical only, 2 = Normal, 3 = Verbose/All
+    LOG_MOUSE_POSITION = True  # Set to True to log mouse position when clicking
+    LOG_STATE_CHANGES = True   # Set to True to log game state changes
+    LOG_ALGORITHM_INFO = True  # Set to True to log algorithm selection and execution
+    
     # Screen and window settings
     SCREEN_SCALE = 0.8  # 80% of screen size
     
@@ -166,5 +172,31 @@ class Config:
             'padding': 10,
             'line_height': 25
         }
+    
+    @staticmethod
+    def log(module, message, level=2, show_pos=False, mouse_pos=None):
+        """
+        Central logging function that respects log level settings.
+        
+        Args:
+            module (str): Module name (e.g., "GameManager", "Stage")
+            message (str): Message to log
+            level (int): Log level (1=Critical, 2=Normal, 3=Verbose)
+            show_pos (bool): Whether to include mouse position
+            mouse_pos (tuple): Current mouse position (x, y)
+        """
+        # Skip if log level is too low
+        if Config.LOG_LEVEL < level:
+            return
+            
+        # Format basic message
+        log_msg = f"[{module}] {message}"
+        
+        # Add mouse position if requested and available
+        if show_pos and Config.LOG_MOUSE_POSITION and mouse_pos:
+            log_msg += f" | Mouse: {mouse_pos}"
+            
+        # Print the message
+        print(log_msg)
         
     

@@ -1,0 +1,22 @@
+{
+    "username": "mook",
+    "current_level": 11,
+    "highest_completed_level": 11,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS",
+            "Dijkstra",
+            "AStar",
+            "RRT"
+        ],
+        "Collision avoidance": [
+            "VFH",
+            "Bug"
+        ],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}

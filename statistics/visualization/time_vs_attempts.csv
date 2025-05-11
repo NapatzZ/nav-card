@@ -1,5 +1,13 @@
 username,level,algorithm,attempt,time_seconds
-jonathan,1,DFS,1,57.74
-josh,1,DFS,1,57.937
-ant,1,DFS,1,43.863
-ant,1,DFS,1,2.011
+test_user,1,DFS,1,120.5
+test_user,1,DFS,2,95.3
+test_user,1,DFS,3,83.2
+test_user,2,BFS,1,150.7
+test_user,2,BFS,2,130.5
+test_user,3,AStar,1,175.8
+test_user,3,AStar,2,160.4
+player2,1,DFS,1,105.2
+player2,2,BFS,1,142.7
+player2,2,Dijkstra,2,120.3
+napat,1,DFS,1,11.508
+napat,2,BFS,1,12.612

@@ -1,0 +1,10 @@
+{
+    "username": "test_user",
+    "current_level": 3,
+    "highest_completed_level": 2,
+    "unlocked_cards": {
+        "Navigation": ["DFS", "BFS", "AStar", "Dijkstra"],
+        "Collision avoidance": ["VFH", "Bug"],
+        "Recovery": ["SpinInPlace", "StepBack"]
+    }
+} 

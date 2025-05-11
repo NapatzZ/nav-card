@@ -74,6 +74,19 @@ class BaseAlgorithm:
             self.robot_pos = new_pos
             self.current_path_index += 1
             self.last_step_time = current_time  # อัปเดตเวลาล่าสุด
+            
+            # Check if we've reached the goal
+            if self.robot_pos and self.goal_pos:
+                distance = abs(self.robot_pos[0] - self.goal_pos[0]) + abs(self.robot_pos[1] - self.goal_pos[1])
+                if distance <= 1:  # ถ้าอยู่ในระยะห่างไม่เกิน 1 ช่อง ถือว่าถึงเป้าหมายแล้ว
+                    print(f"[BaseAlgorithm] Goal reached! Distance: {distance}")
+                    # Set final position to exactly the goal position for visual clarity
+                    self.costmap.set_robot_position(*self.goal_pos)
+                    self.robot_pos = self.goal_pos
+                    self.is_completed = True
+                    self.is_running = False
+                    print(f"{self.__class__.__name__}: Path completed - Goal reached")
+                    return False
         else:
             # Reached the end of the path
             self.is_completed = True
