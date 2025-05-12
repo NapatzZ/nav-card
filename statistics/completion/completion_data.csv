@@ -17,3 +17,5 @@ timestamp,username,level,attempt,algorithm_name,algorithm_type,time_seconds,time
 2025-05-11 22:29:30,som,1,1,DFS,Navigation,13.639,00:13.639,1,0,0
 2025-05-11 22:29:46,som,2,1,BFS,Navigation,11.392,00:11.392,1,0,0
 2025-05-11 22:30:04,som,3,1,DFS,Navigation,10.01,00:10.010,0,0,0
+2025-05-13 06:44:22,dsafsdaf,1,1,,,0,00:00.000,0,0,0
+2025-05-13 06:44:39,dsafsdaf,1,1,DFS,Navigation,13.663,00:13.663,1,0,0
