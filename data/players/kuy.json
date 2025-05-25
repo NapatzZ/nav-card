@@ -1,0 +1,19 @@
+{
+    "username": "kuy",
+    "current_level": 5,
+    "highest_completed_level": 4,
+    "unlocked_cards": {
+        "Navigation": [
+            "DFS",
+            "BFS",
+            "Dijkstra"
+        ],
+        "Collision avoidance": [
+            "VFH"
+        ],
+        "Recovery": [
+            "SpinInPlace",
+            "StepBack"
+        ]
+    }
+}
